@@ -97,8 +97,17 @@ const CONFIG = {
   // Gas cost per minute of cooking
   GAS_COST_PER_MINUTE: 2, // ₹2 per minute
   
-  // Available packet sizes in grams
-  PACKET_SIZES: [50, 100, 250, 500],
+  // Available packet sizes in grams and their selling prices
+  PACKET_SIZES: [50, 100, 250, 500, 1000],
+  
+  // Selling price per packet size (in grams)
+  SELLING_PRICES: {
+    50: 15,    // ₹15 per 50g packet
+    100: 25,   // ₹25 per 100g packet  
+    250: 70,   // ₹70 per 250g packet
+    500: 100,  // ₹100 per 500g packet
+    1000: 250  // ₹250 per 1kg packet
+  },
   
   // LocalStorage keys for data persistence
   STORAGE_KEYS: {
@@ -797,7 +806,7 @@ function OrderForm({ onClose, onSuccess, onError }: OrderFormProps) {
     }));
   };
 
-  // Calculate order summary in real-time
+  // Calculate order summary in real-time using CONFIG pricing
   const calculateSummary = () => {
     let totalWeight = 0;
     let totalPackets = 0;
@@ -806,7 +815,8 @@ function OrderForm({ onClose, onSuccess, onError }: OrderFormProps) {
     CONFIG.PACKET_SIZES.forEach(size => {
       const qty = packages[size] || 0;
       const weight = size * qty;
-      const amount = (size / 10) * qty; // ₹1 per 10g
+      const pricePerPacket = CONFIG.SELLING_PRICES[size as keyof typeof CONFIG.SELLING_PRICES] || 0;
+      const amount = pricePerPacket * qty;
 
       totalWeight += weight;
       totalPackets += qty;
@@ -836,15 +846,19 @@ function OrderForm({ onClose, onSuccess, onError }: OrderFormProps) {
       return;
     }
 
-    // Create package items array
+    // Create package items array with correct pricing
     const packageItems: PackageItem[] = CONFIG.PACKET_SIZES
       .filter(size => packages[size] > 0)
-      .map(size => ({
-        size,
-        quantity: packages[size],
-        weight: size * packages[size],
-        amount: (size / 10) * packages[size]
-      }));
+      .map(size => {
+        const qty = packages[size];
+        const pricePerPacket = CONFIG.SELLING_PRICES[size as keyof typeof CONFIG.SELLING_PRICES] || 0;
+        return {
+          size,
+          quantity: qty,
+          weight: size * qty,
+          amount: pricePerPacket * qty
+        };
+      });
 
     const orderData = {
       customerName: customerName.trim(),
@@ -921,11 +935,11 @@ function OrderForm({ onClose, onSuccess, onError }: OrderFormProps) {
                         className="text-center mb-2"
                       />
                       <div className="text-xs text-gray-500">
-                        Rate: ₹{size/10}/packet
+                        Rate: ₹{CONFIG.SELLING_PRICES[size as keyof typeof CONFIG.SELLING_PRICES]}/packet
                       </div>
                       {packages[size] > 0 && (
                         <div className="text-xs text-primary font-medium mt-1">
-                          Total: {DataManager.formatCurrency((size/10) * packages[size])}
+                          Total: {DataManager.formatCurrency(CONFIG.SELLING_PRICES[size as keyof typeof CONFIG.SELLING_PRICES] * packages[size])}
                         </div>
                       )}
                     </div>
