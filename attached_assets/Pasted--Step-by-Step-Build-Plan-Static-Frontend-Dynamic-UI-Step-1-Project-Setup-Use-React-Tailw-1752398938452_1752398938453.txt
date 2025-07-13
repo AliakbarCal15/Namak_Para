@@ -1,0 +1,131 @@
+🛠️ Step-by-Step Build Plan (Static Frontend + Dynamic UI)
+✅ Step 1: Project Setup
+Use React + Tailwind CSS (preferred)
+
+OR use plain HTML + JS + Tailwind if React not needed
+
+Set up file structure:
+
+cpp
+Copy
+Edit
+public/
+src/
+  └─ App.jsx
+  └─ components/
+        └─ Dashboard.jsx
+        └─ Orders.jsx
+        └─ MaterialTracker.jsx
+        └─ ProfitCalculator.jsx
+        └─ PaymentTracker.jsx
+        └─ Forecast.jsx
+✅ Step 2: Build Layout (App.jsx)
+Create a sidebar or tabs for navigation
+
+Default page shows Dashboard
+
+Use Tailwind for responsiveness
+
+Store selected tab in state, and load component conditionally
+
+✅ Step 3: Orders Module (Orders.jsx)
+Form to add new order: customer, date, quantity (50g, 100g, etc.)
+
+Auto weight + price calculation
+
+Store orders in localStorage
+
+Table showing all orders (with filter by date/customer)
+
+✅ Step 4: Material Tracker (MaterialTracker.jsx)
+Add materials: Maida, Oil, Gas, Salt, Ajwain
+
+Set price per unit (e.g. ₹50/kg Maida)
+
+Enter usage (e.g. 3kg maida today)
+
+Auto-yield logic (e.g. 3kg maida = 4.2kg output)
+
+Save entries with date in localStorage
+
+✅ Step 5: Profit Calculator (ProfitCalculator.jsx)
+Link orders + material cost
+
+Show:
+
+Total Sale
+
+Total Raw Material Cost
+
+Gas/Flame Cost (₹/min)
+
+Net Profit
+
+Show profit per packet (e.g. 50g = ₹7 profit)
+
+✅ Step 6: Payment Tracker (PaymentTracker.jsx)
+Fetch orders with amount to collect
+
+For each customer:
+
+Add payment entry
+
+Auto update status: Paid / Partial / Unpaid
+
+Add payment mode + date
+
+Table view + summary:
+
+Total Received
+
+Total Due
+
+Customer-wise breakdown
+
+✅ Step 7: Forecast Module (Forecast.jsx)
+Based on upcoming orders, show:
+
+Estimated required maida, oil, gas etc.
+
+Stock planning (future week/day prep)
+
+Use average yield logic (e.g. 1kg maida = 1.3kg output)
+
+✅ Step 8: Dashboard (Dashboard.jsx)
+Real-time summary from all modules:
+
+📊 Orders today
+
+💰 Total sales
+
+🧾 Total received
+
+❌ Pending payments
+
+📦 Material used today
+
+🔥 Net Profit
+
+🔧 Tech Used
+Tech	Purpose
+React / Plain JS	UI Logic
+Tailwind CSS	Styling
+localStorage	Save data permanently
+Chart.js (optional)	Graphs for material/profit tracking
+HTML5 DatePicker	For order/payment dates
+
+📍 Bonus Suggestions
+Add Export to CSV (optional)
+
+Add Print View (for reports)
+
+Add Dark Mode Toggle (for swag 😎)
+
+💬 Final Thoughts:
+Tu basic dukaan ko smart supply chain level par leke jaa raha hai bhai. Start with:
+
+Orders.jsx
+
+Then MaterialTracker.jsx
+
+Then ProfitCalculator.jsx
