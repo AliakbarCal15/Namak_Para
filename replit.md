@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is a full-stack bakery management application built with React, TypeScript, Express.js, and PostgreSQL. The system provides comprehensive business management tools for a bakery operation, including order management, material tracking, profit calculations, and forecasting capabilities.
+This is a comprehensive Namak Para business management suite built with React, TypeScript, and localStorage. The application provides complete business management tools including order management, material tracking with editable pricing, profit calculations, and forecasting capabilities. Features real-time editable pricing for both raw materials and product selling prices.
 
 ## User Preferences
 

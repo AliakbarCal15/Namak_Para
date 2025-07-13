@@ -100,8 +100,8 @@ const CONFIG = {
   // Available packet sizes in grams and their selling prices
   PACKET_SIZES: [50, 100, 250, 500, 1000],
   
-  // Selling price per packet size (in grams)
-  SELLING_PRICES: {
+  // Default selling prices per packet size (in grams) - ये editable हैं
+  DEFAULT_SELLING_PRICES: {
     50: 15,    // ₹15 per 50g packet
     100: 25,   // ₹25 per 100g packet  
     250: 70,   // ₹70 per 250g packet
@@ -127,13 +127,39 @@ class DataManager {
   static initializeDefaultData() {
     if (!DataManager.getMaterials().length) {
       DataManager.saveMaterials([
-        { id: 1, name: 'Maida', unit: 'kg', pricePerUnit: 50, stock: 0 },
+        { id: 1, name: 'Maida', unit: 'kg', pricePerUnit: 45, stock: 0 },
         { id: 2, name: 'Oil', unit: 'litre', pricePerUnit: 120, stock: 0 },
-        { id: 3, name: 'Salt', unit: 'kg', pricePerUnit: 20, stock: 0 },
-        { id: 4, name: 'Ajwain', unit: 'kg', pricePerUnit: 300, stock: 0 },
-        { id: 5, name: 'Gas', unit: 'cylinder', pricePerUnit: 800, stock: 0 }
+        { id: 3, name: 'Salt', unit: 'kg', pricePerUnit: 5, stock: 0 },
+        { id: 4, name: 'Ajwain', unit: 'kg', pricePerUnit: 7, stock: 0 },
+        { id: 5, name: 'Gas', unit: 'per kg production', pricePerUnit: 25, stock: 0 }
       ]);
     }
+  }
+
+  // Update material price - नई function for price editing
+  static updateMaterialPrice(materialId: number, newPrice: number) {
+    const materials = DataManager.getMaterials();
+    const materialIndex = materials.findIndex(m => m.id === materialId);
+    if (materialIndex !== -1) {
+      materials[materialIndex].pricePerUnit = newPrice;
+      DataManager.saveMaterials(materials);
+    }
+  }
+
+  // Product pricing management - selling prices को localStorage में store करते हैं
+  static getSellingPrices() {
+    const stored = localStorage.getItem('namakpara_selling_prices');
+    return stored ? JSON.parse(stored) : CONFIG.DEFAULT_SELLING_PRICES;
+  }
+
+  static saveSellingPrices(prices: { [key: number]: number }) {
+    localStorage.setItem('namakpara_selling_prices', JSON.stringify(prices));
+  }
+
+  static updateSellingPrice(size: number, newPrice: number) {
+    const prices = DataManager.getSellingPrices();
+    prices[size] = newPrice;
+    DataManager.saveSellingPrices(prices);
   }
 
   // Orders management - सभी orders को handle करते हैं
@@ -791,6 +817,7 @@ function OrderForm({ onClose, onSuccess, onError }: OrderFormProps) {
   const [customerName, setCustomerName] = useState('');
   const [deliveryDate, setDeliveryDate] = useState('');
   const [packages, setPackages] = useState<{ [key: number]: number }>({});
+  const [currentPrices, setCurrentPrices] = useState(DataManager.getSellingPrices());
 
   // Set tomorrow as default delivery date
   useEffect(() => {
@@ -806,16 +833,17 @@ function OrderForm({ onClose, onSuccess, onError }: OrderFormProps) {
     }));
   };
 
-  // Calculate order summary in real-time using CONFIG pricing
+  // Calculate order summary in real-time using dynamic pricing
   const calculateSummary = () => {
     let totalWeight = 0;
     let totalPackets = 0;
     let totalAmount = 0;
+    const currentPrices = DataManager.getSellingPrices();
 
     CONFIG.PACKET_SIZES.forEach(size => {
       const qty = packages[size] || 0;
       const weight = size * qty;
-      const pricePerPacket = CONFIG.SELLING_PRICES[size as keyof typeof CONFIG.SELLING_PRICES] || 0;
+      const pricePerPacket = currentPrices[size] || 0;
       const amount = pricePerPacket * qty;
 
       totalWeight += weight;
@@ -846,12 +874,13 @@ function OrderForm({ onClose, onSuccess, onError }: OrderFormProps) {
       return;
     }
 
-    // Create package items array with correct pricing
+    // Create package items array with current pricing
+    const currentPrices = DataManager.getSellingPrices();
     const packageItems: PackageItem[] = CONFIG.PACKET_SIZES
       .filter(size => packages[size] > 0)
       .map(size => {
         const qty = packages[size];
-        const pricePerPacket = CONFIG.SELLING_PRICES[size as keyof typeof CONFIG.SELLING_PRICES] || 0;
+        const pricePerPacket = currentPrices[size] || 0;
         return {
           size,
           quantity: qty,
@@ -935,11 +964,11 @@ function OrderForm({ onClose, onSuccess, onError }: OrderFormProps) {
                         className="text-center mb-2"
                       />
                       <div className="text-xs text-gray-500">
-                        Rate: ₹{CONFIG.SELLING_PRICES[size as keyof typeof CONFIG.SELLING_PRICES]}/packet
+                        Rate: ₹{currentPrices[size]}/packet
                       </div>
                       {packages[size] > 0 && (
                         <div className="text-xs text-primary font-medium mt-1">
-                          Total: {DataManager.formatCurrency(CONFIG.SELLING_PRICES[size as keyof typeof CONFIG.SELLING_PRICES] * packages[size])}
+                          Total: {DataManager.formatCurrency(currentPrices[size] * packages[size])}
                         </div>
                       )}
                     </div>
@@ -1024,6 +1053,19 @@ function MaterialsContent({ showMaterialForm, setShowMaterialForm, showSuccess, 
     showSuccess(`✅ Stock updated for ${material?.name}!`);
   };
 
+  const handlePriceUpdate = (materialId: number, newPrice: number) => {
+    if (newPrice <= 0) {
+      showError('कृपया सही price enter करें!');
+      return;
+    }
+
+    DataManager.updateMaterialPrice(materialId, newPrice);
+    refreshData();
+    
+    const material = materials.find(m => m.id === materialId);
+    showSuccess(`✅ Price updated for ${material?.name}!`);
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1053,9 +1095,23 @@ function MaterialsContent({ showMaterialForm, setShowMaterialForm, showSuccess, 
             key={material.id}
             material={material}
             onStockUpdate={handleStockUpdate}
+            onPriceUpdate={handlePriceUpdate}
           />
         ))}
       </div>
+
+      {/* Product Pricing Management */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calculator className="w-5 h-5" />
+            Product Selling Prices (Click to Edit)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ProductPricingSection showSuccess={showSuccess} showError={showError} />
+        </CardContent>
+      </Card>
 
       {/* Usage History */}
       <Card>
@@ -1112,10 +1168,13 @@ function MaterialsContent({ showMaterialForm, setShowMaterialForm, showSuccess, 
 interface MaterialCardProps {
   material: Material;
   onStockUpdate: (materialId: number, quantity: number) => void;
+  onPriceUpdate?: (materialId: number, newPrice: number) => void;
 }
 
-function MaterialCard({ material, onStockUpdate }: MaterialCardProps) {
+function MaterialCard({ material, onStockUpdate, onPriceUpdate }: MaterialCardProps) {
   const [additionalStock, setAdditionalStock] = useState('');
+  const [isEditingPrice, setIsEditingPrice] = useState(false);
+  const [newPrice, setNewPrice] = useState(material.pricePerUnit.toString());
 
   const handleStockUpdate = () => {
     const quantity = parseFloat(additionalStock);
@@ -1125,6 +1184,19 @@ function MaterialCard({ material, onStockUpdate }: MaterialCardProps) {
     }
   };
 
+  const handlePriceUpdate = () => {
+    const price = parseFloat(newPrice);
+    if (price > 0 && onPriceUpdate) {
+      onPriceUpdate(material.id, price);
+      setIsEditingPrice(false);
+    }
+  };
+
+  const cancelPriceEdit = () => {
+    setNewPrice(material.pricePerUnit.toString());
+    setIsEditingPrice(false);
+  };
+
   return (
     <Card className="card-hover">
       <CardContent className="p-6">
@@ -1132,9 +1204,34 @@ function MaterialCard({ material, onStockUpdate }: MaterialCardProps) {
           <h3 className="text-lg font-semibold text-gray-800">{material.name}</h3>
           <div className="text-right">
             <div className="text-sm text-gray-600">Rate</div>
-            <div className="font-semibold text-primary">
-              {DataManager.formatCurrency(material.pricePerUnit)}/{material.unit}
-            </div>
+            {isEditingPrice ? (
+              <div className="flex items-center gap-2 mt-1">
+                <Input
+                  type="number"
+                  value={newPrice}
+                  onChange={(e) => setNewPrice(e.target.value)}
+                  className="w-20 h-8 text-sm"
+                  min="0"
+                  step="0.1"
+                />
+                <div className="flex gap-1">
+                  <Button size="sm" onClick={handlePriceUpdate} className="h-8 px-2">
+                    <CheckCircle className="w-3 h-3" />
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={cancelPriceEdit} className="h-8 px-2">
+                    <X className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div 
+                className="font-semibold text-primary cursor-pointer hover:bg-gray-100 px-2 py-1 rounded"
+                onClick={() => setIsEditingPrice(true)}
+                title="Click to edit price"
+              >
+                {DataManager.formatCurrency(material.pricePerUnit)}/{material.unit}
+              </div>
+            )}
           </div>
         </div>
         
@@ -1166,7 +1263,94 @@ function MaterialCard({ material, onStockUpdate }: MaterialCardProps) {
 }
 
 // ==========================================
-// 📝 MATERIAL USAGE FORM COMPONENT
+// 💰 PRODUCT PRICING SECTION COMPONENT
+// ==========================================
+
+interface ProductPricingSectionProps {
+  showSuccess: (message: string) => void;
+  showError: (message: string) => void;
+}
+
+function ProductPricingSection({ showSuccess, showError }: ProductPricingSectionProps) {
+  const [sellingPrices, setSellingPrices] = useState(DataManager.getSellingPrices());
+  const [editingSize, setEditingSize] = useState<number | null>(null);
+  const [tempPrice, setTempPrice] = useState('');
+
+  const startEdit = (size: number) => {
+    setEditingSize(size);
+    setTempPrice(sellingPrices[size].toString());
+  };
+
+  const savePrice = () => {
+    if (editingSize !== null) {
+      const newPrice = parseFloat(tempPrice);
+      if (newPrice > 0) {
+        DataManager.updateSellingPrice(editingSize, newPrice);
+        setSellingPrices(DataManager.getSellingPrices());
+        setEditingSize(null);
+        showSuccess(`✅ Price updated for ${editingSize}g packets!`);
+      } else {
+        showError('कृपया सही price enter करें!');
+      }
+    }
+  };
+
+  const cancelEdit = () => {
+    setEditingSize(null);
+    setTempPrice('');
+  };
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      {CONFIG.PACKET_SIZES.map(size => (
+        <div key={size} className="p-4 border rounded-lg hover:bg-gray-50">
+          <div className="text-center">
+            <div className="text-lg font-semibold text-gray-700 mb-2">
+              {size}g Packet
+            </div>
+            
+            {editingSize === size ? (
+              <div className="space-y-2">
+                <Input
+                  type="number"
+                  value={tempPrice}
+                  onChange={(e) => setTempPrice(e.target.value)}
+                  className="text-center h-8"
+                  min="0"
+                  step="1"
+                  autoFocus
+                />
+                <div className="flex gap-1 justify-center">
+                  <Button size="sm" onClick={savePrice} className="h-7 px-2">
+                    <CheckCircle className="w-3 h-3" />
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={cancelEdit} className="h-7 px-2">
+                    <X className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div
+                className="text-xl font-bold text-primary cursor-pointer hover:bg-primary hover:text-white px-3 py-2 rounded transition-colors"
+                onClick={() => startEdit(size)}
+                title="Click to edit price"
+              >
+                ₹{sellingPrices[size]}
+              </div>
+            )}
+            
+            <div className="text-xs text-gray-500 mt-1">
+              per packet
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ==========================================
+// 📝 MATERIAL USAGE FORM COMPONENT  
 // ==========================================
 
 interface MaterialUsageFormProps {
