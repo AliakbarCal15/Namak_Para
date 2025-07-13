@@ -513,6 +513,18 @@ export default function Dashboard() {
 // ==========================================
 
 function DashboardContent() {
+  // State management for dynamic updates जब payments add होती हैं
+  const [refreshKey, setRefreshKey] = useState(0);
+  
+  // Real-time data refresh mechanism
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setRefreshKey(prev => prev + 1);
+    }, 2000); // Refresh every 2 seconds to catch payment updates
+    
+    return () => clearInterval(interval);
+  }, []);
+
   const summary = BusinessCalculator.getTodaysSummary();
   const orders = DataManager.getOrders();
   const payments = DataManager.getPayments();
@@ -533,8 +545,8 @@ function DashboardContent() {
         </Button>
       </div>
 
-      {/* Key Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Key Metrics Cards - Dynamic updates के साथ */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" key={refreshKey}>
         <Card className="card-hover">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -1507,21 +1519,53 @@ function MaterialUsageForm({ onClose, onSuccess, onError }: MaterialUsageFormPro
 // ==========================================
 
 function ProfitContent() {
+  // State management for dynamic updates
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [currentPrices, setCurrentPrices] = useState(DataManager.getSellingPrices());
+  const [currentMaterials, setCurrentMaterials] = useState(DataManager.getMaterials());
+
+  // Force refresh when prices change - refresh को trigger करने के लिए
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const newPrices = DataManager.getSellingPrices();
+      const newMaterials = DataManager.getMaterials();
+      
+      // Check if prices changed - price में change हुआ है या नहीं check करते हैं
+      if (JSON.stringify(newPrices) !== JSON.stringify(currentPrices) ||
+          JSON.stringify(newMaterials) !== JSON.stringify(currentMaterials)) {
+        setCurrentPrices(newPrices);
+        setCurrentMaterials(newMaterials);
+        setRefreshKey(prev => prev + 1);
+      }
+    }, 1000); // Check every second for price changes
+
+    return () => clearInterval(interval);
+  }, [currentPrices, currentMaterials]);
+
   const orders = DataManager.getOrders();
+  const payments = DataManager.getPayments();
   
-  // Calculate overall profit metrics
+  // Calculate overall profit metrics with real pricing
   let totalRevenue = 0;
   let totalCost = 0;
+  let totalPaid = 0;
   
   orders.forEach(order => {
     totalRevenue += order.totalAmount;
-    // Estimate cost based on weight (simplified calculation)
-    const estimatedCost = (order.totalWeight / 1000) * 80; // ₹80 per kg average cost
-    totalCost += estimatedCost;
+    // Calculate real cost using current material prices और actual requirements
+    const requirements = BusinessCalculator.calculateMaterialRequirements(order.totalWeight);
+    const realCost = BusinessCalculator.calculateProductionCost(requirements);
+    totalCost += realCost;
+  });
+
+  // Calculate total payments received
+  payments.forEach(payment => {
+    totalPaid += payment.amount;
   });
 
   const totalProfit = totalRevenue - totalCost;
   const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue * 100) : 0;
+  const pendingAmount = totalRevenue - totalPaid;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -1533,81 +1577,148 @@ function ProfitContent() {
         </Button>
       </div>
 
-      {/* Profit Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      {/* Profit Overview Cards - Dynamic updates के साथ */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4" key={refreshKey}>
         <Card className="card-hover">
-          <CardContent className="p-6 text-center">
-            <DollarSign className="w-8 h-8 text-green-600 mx-auto mb-3" />
-            <h3 className="text-sm font-medium text-gray-600">Total Revenue</h3>
-            <p className="text-2xl font-bold text-green-600">
+          <CardContent className="p-4 text-center">
+            <DollarSign className="w-6 h-6 text-green-600 mx-auto mb-2" />
+            <h3 className="text-xs font-medium text-gray-600">Total Revenue</h3>
+            <p className="text-lg font-bold text-green-600">
               {DataManager.formatCurrency(totalRevenue)}
             </p>
           </CardContent>
         </Card>
 
         <Card className="card-hover">
-          <CardContent className="p-6 text-center">
-            <AlertTriangle className="w-8 h-8 text-red-600 mx-auto mb-3" />
-            <h3 className="text-sm font-medium text-gray-600">Total Cost</h3>
-            <p className="text-2xl font-bold text-red-600">
+          <CardContent className="p-4 text-center">
+            <AlertTriangle className="w-6 h-6 text-red-600 mx-auto mb-2" />
+            <h3 className="text-xs font-medium text-gray-600">Total Cost</h3>
+            <p className="text-lg font-bold text-red-600">
               {DataManager.formatCurrency(totalCost)}
             </p>
           </CardContent>
         </Card>
 
         <Card className="card-hover">
-          <CardContent className="p-6 text-center">
-            <TrendingUp className="w-8 h-8 text-blue-600 mx-auto mb-3" />
-            <h3 className="text-sm font-medium text-gray-600">Net Profit</h3>
-            <p className={`text-2xl font-bold ${totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+          <CardContent className="p-4 text-center">
+            <TrendingUp className="w-6 h-6 text-blue-600 mx-auto mb-2" />
+            <h3 className="text-xs font-medium text-gray-600">Net Profit</h3>
+            <p className={`text-lg font-bold ${totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
               {DataManager.formatCurrency(totalProfit)}
             </p>
           </CardContent>
         </Card>
 
         <Card className="card-hover">
-          <CardContent className="p-6 text-center">
-            <Percent className="w-8 h-8 text-purple-600 mx-auto mb-3" />
-            <h3 className="text-sm font-medium text-gray-600">Profit Margin</h3>
-            <p className="text-2xl font-bold text-purple-600">{profitMargin.toFixed(1)}%</p>
+          <CardContent className="p-4 text-center">
+            <Wallet className="w-6 h-6 text-purple-600 mx-auto mb-2" />
+            <h3 className="text-xs font-medium text-gray-600">Total Paid</h3>
+            <p className="text-lg font-bold text-purple-600">
+              {DataManager.formatCurrency(totalPaid)}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="card-hover">
+          <CardContent className="p-4 text-center">
+            <Clock className="w-6 h-6 text-orange-600 mx-auto mb-2" />
+            <h3 className="text-xs font-medium text-gray-600">Pending Due</h3>
+            <p className="text-lg font-bold text-orange-600">
+              {DataManager.formatCurrency(pendingAmount)}
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Profit per Package Size */}
+      {/* Profit Margin and Key Metrics */}
+      <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
+        <CardContent className="p-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+            <div>
+              <Percent className="w-8 h-8 text-purple-600 mx-auto mb-2" />
+              <h3 className="text-sm font-medium text-gray-600">Profit Margin</h3>
+              <p className="text-2xl font-bold text-purple-600">{profitMargin.toFixed(1)}%</p>
+            </div>
+            <div>
+              <BarChart3 className="w-8 h-8 text-blue-600 mx-auto mb-2" />
+              <h3 className="text-sm font-medium text-gray-600">Total Orders</h3>
+              <p className="text-2xl font-bold text-blue-600">{orders.length}</p>
+            </div>
+            <div>
+              <Calculator className="w-8 h-8 text-green-600 mx-auto mb-2" />
+              <h3 className="text-sm font-medium text-gray-600">Avg Order Value</h3>
+              <p className="text-2xl font-bold text-green-600">
+                {orders.length > 0 ? DataManager.formatCurrency(totalRevenue / orders.length) : '₹0'}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Profit per Package Size - Dynamic calculations के साथ */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calculator className="w-5 h-5" />
-            Profit per Package Size
+            Profit per Package Size (Real-time)
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4" key={`package-${refreshKey}`}>
             {CONFIG.PACKET_SIZES.map(size => {
-              const sellingPrice = size / 10; // ₹1 per 10g
-              const costPrice = (size / 1000) * 80; // ₹80 per kg cost
-              const profit = sellingPrice - costPrice;
-              const profitPercent = (profit / sellingPrice * 100);
+              // Real-time selling price from current settings
+              const sellingPrice = currentPrices[size] || 0;
+              
+              // Real cost calculation using current material prices
+              const requirements = BusinessCalculator.calculateMaterialRequirements(size);
+              const realCostPrice = BusinessCalculator.calculateProductionCost(requirements);
+              
+              const profit = sellingPrice - realCostPrice;
+              const profitPercent = sellingPrice > 0 ? (profit / sellingPrice * 100) : 0;
               
               return (
-                <Card key={size}>
-                  <CardContent className="p-4 text-center">
+                <Card key={size} className={`${profit >= 0 ? 'border-green-200' : 'border-red-200'}`}>
+                  <CardContent className="p-3 text-center">
                     <h4 className="font-semibold text-gray-800 mb-2">{size}g Packet</h4>
-                    <div className="space-y-2 text-sm">
+                    <div className="space-y-1 text-xs">
                       <div className="flex justify-between">
                         <span>Selling:</span>
-                        <span className="font-medium">{DataManager.formatCurrency(sellingPrice)}</span>
+                        <span className="font-medium text-green-700">{DataManager.formatCurrency(sellingPrice)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span>Cost:</span>
-                        <span className="font-medium">{DataManager.formatCurrency(costPrice)}</span>
+                        <span className="font-medium text-red-700">{DataManager.formatCurrency(realCostPrice)}</span>
                       </div>
-                      <div className="flex justify-between border-t pt-2 font-semibold">
+                      <div className="flex justify-between border-t pt-1 font-semibold">
                         <span>Profit:</span>
-                        <span className="text-green-600">{DataManager.formatCurrency(profit)}</span>
+                        <span className={profit >= 0 ? 'text-green-600' : 'text-red-600'}>
+                          {DataManager.formatCurrency(profit)}
+                        </span>
                       </div>
-                      <div className="text-xs text-gray-500">{profitPercent.toFixed(1)}% margin</div>
+                      <div className={`text-xs font-medium ${profitPercent >= 20 ? 'text-green-600' : profitPercent >= 10 ? 'text-yellow-600' : 'text-red-600'}`}>
+                        {profitPercent.toFixed(1)}% margin
+                      </div>
+                      
+                      {/* Profit status indicator */}
+                      <div className="mt-2">
+                        {profitPercent >= 20 ? (
+                          <div className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
+                            Excellent
+                          </div>
+                        ) : profitPercent >= 10 ? (
+                          <div className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs">
+                            Good
+                          </div>
+                        ) : profitPercent >= 0 ? (
+                          <div className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs">
+                            Low
+                          </div>
+                        ) : (
+                          <div className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs">
+                            Loss
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -1640,8 +1751,13 @@ function ProfitContent() {
               </TableHeader>
               <TableBody>
                 {orders.slice(-10).reverse().map(order => {
-                  const estimatedCost = (order.totalWeight / 1000) * 80;
-                  const profit = order.totalAmount - estimatedCost;
+                  // Real cost calculation using current material prices
+                  const requirements = BusinessCalculator.calculateMaterialRequirements(order.totalWeight);
+                  const realCost = BusinessCalculator.calculateProductionCost(requirements);
+                  const profit = order.totalAmount - realCost;
+                  
+                  // Payment status for this order
+                  const paymentStatus = BusinessCalculator.getPaymentStatus(order.id);
                   
                   return (
                     <TableRow key={order.id} className="hover:bg-gray-50">
@@ -1652,7 +1768,7 @@ function ProfitContent() {
                         {DataManager.formatCurrency(order.totalAmount)}
                       </TableCell>
                       <TableCell className="text-red-600">
-                        {DataManager.formatCurrency(estimatedCost)}
+                        {DataManager.formatCurrency(realCost)}
                       </TableCell>
                       <TableCell className={`font-semibold ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                         {DataManager.formatCurrency(profit)}
