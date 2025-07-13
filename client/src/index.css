@@ -1,0 +1,132 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: hsl(0, 0%, 100%);
+  --foreground: hsl(20, 14.3%, 4.1%);
+  --muted: hsl(35, 12%, 95%);
+  --muted-foreground: hsl(25, 5.3%, 44.7%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(20, 14.3%, 4.1%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(20, 14.3%, 4.1%);
+  --border: hsl(30, 8%, 88%);
+  --input: hsl(30, 8%, 88%);
+  --primary: hsl(20, 85%, 58%);
+  --primary-foreground: hsl(0, 0%, 98%);
+  --secondary: hsl(35, 12%, 95%);
+  --secondary-foreground: hsl(20, 14.3%, 4.1%);
+  --accent: hsl(25, 65%, 70%);
+  --accent-foreground: hsl(20, 14.3%, 4.1%);
+  --destructive: hsl(0, 84.2%, 60.2%);
+  --destructive-foreground: hsl(60, 9.1%, 97.8%);
+  --ring: hsl(20, 14.3%, 4.1%);
+  --radius: 0.5rem;
+  --success: hsl(142, 76%, 36%);
+  --warning: hsl(45, 93%, 47%);
+}
+
+.dark {
+  --background: hsl(24, 9.8%, 10%);
+  --foreground: hsl(0, 0%, 98%);
+  --muted: hsl(24, 9.8%, 15%);
+  --muted-foreground: hsl(24, 5.4%, 63.9%);
+  --popover: hsl(24, 9.8%, 10%);
+  --popover-foreground: hsl(0, 0%, 98%);
+  --card: hsl(24, 9.8%, 10%);
+  --card-foreground: hsl(0, 0%, 98%);
+  --border: hsl(24, 5.7%, 25.9%);
+  --input: hsl(24, 5.7%, 25.9%);
+  --primary: hsl(20, 85%, 58%);
+  --primary-foreground: hsl(0, 0%, 98%);
+  --secondary: hsl(24, 5.7%, 25.9%);
+  --secondary-foreground: hsl(0, 0%, 98%);
+  --accent: hsl(25, 65%, 70%);
+  --accent-foreground: hsl(24, 9.8%, 10%);
+  --destructive: hsl(0, 62.8%, 30.6%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --ring: hsl(24, 5.7%, 82.9%);
+  --success: hsl(142, 76%, 36%);
+  --warning: hsl(45, 93%, 47%);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+  }
+}
+
+/* Custom styles for Namak Para business theme */
+.gradient-bg {
+  background: linear-gradient(135deg, hsl(20, 85%, 58%) 0%, hsl(25, 65%, 70%) 100%);
+}
+
+.business-card {
+  @apply bg-card border border-border rounded-lg shadow-sm;
+}
+
+.card-hover {
+  @apply transition-all duration-200 hover:shadow-md hover:-translate-y-1;
+}
+
+/* Print styles for reports */
+@media print {
+  .no-print { 
+    display: none !important; 
+  }
+  .print-break { 
+    page-break-after: always; 
+  }
+  body {
+    @apply text-black bg-white;
+  }
+  .business-card {
+    @apply border border-gray-300;
+  }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .mobile-stack { 
+    flex-direction: column !important; 
+  }
+  .mobile-full { 
+    width: 100% !important; 
+  }
+}
+
+/* Custom animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Toast notification styles */
+.toast {
+  @apply fixed top-4 right-4 z-50 px-6 py-3 rounded-lg text-white font-medium shadow-lg transition-all duration-300;
+}
+
+.toast-success {
+  @apply bg-green-600;
+}
+
+.toast-error {
+  @apply bg-red-600;
+}
+
+.toast-warning {
+  @apply bg-yellow-600;
+}
+
+.toast-info {
+  @apply bg-blue-600;
+}
