@@ -265,6 +265,16 @@ export default function PaymentTracker() {
     wholesale: {}
   });
 
+  // Search and filter states
+  const [searchFilters, setSearchFilters] = useState({
+    orders: '',
+    income: '',
+    expenses: ''
+  });
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'completed'>('all');
+  const [priceTypeFilter, setPriceTypeFilter] = useState<'all' | 'retail' | 'wholesale'>('all');
+  const [expenseTypeFilter, setExpenseTypeFilter] = useState<'all' | 'business' | 'extra'>('all');
+
   // Load data on mount and refresh
   useEffect(() => {
     setOrders(PaymentDataManager.getOrders());
@@ -287,6 +297,43 @@ export default function PaymentTracker() {
     
     setCurrentPrices(updatedPrices);
     PaymentDataManager.saveSellingPrices(updatedPrices);
+  };
+
+  // Filter functions
+  const getFilteredOrders = () => {
+    return orders.filter(order => {
+      const matchesSearch = searchFilters.orders === '' || 
+        order.customerName.toLowerCase().includes(searchFilters.orders.toLowerCase()) ||
+        order.id.toLowerCase().includes(searchFilters.orders.toLowerCase());
+      
+      const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
+      const matchesPriceType = priceTypeFilter === 'all' || order.priceType === priceTypeFilter;
+      
+      return matchesSearch && matchesStatus && matchesPriceType;
+    });
+  };
+
+  const getFilteredIncome = () => {
+    return incomeEntries.filter(entry => {
+      return searchFilters.income === '' || 
+        entry.customerName.toLowerCase().includes(searchFilters.income.toLowerCase()) ||
+        (entry.orderSize && entry.orderSize.toLowerCase().includes(searchFilters.income.toLowerCase())) ||
+        (entry.remarks && entry.remarks.toLowerCase().includes(searchFilters.income.toLowerCase()));
+    });
+  };
+
+  const getFilteredExpenses = () => {
+    return expenseEntries.filter(entry => {
+      const matchesSearch = searchFilters.expenses === '' || 
+        entry.item.toLowerCase().includes(searchFilters.expenses.toLowerCase()) ||
+        (entry.remarks && entry.remarks.toLowerCase().includes(searchFilters.expenses.toLowerCase()));
+      
+      const matchesType = expenseTypeFilter === 'all' || 
+        (expenseTypeFilter === 'business' && !entry.isExtra) ||
+        (expenseTypeFilter === 'extra' && entry.isExtra);
+      
+      return matchesSearch && matchesType;
+    });
   };
 
   // Calculate totals
@@ -571,6 +618,67 @@ export default function PaymentTracker() {
               </Button>
             </div>
 
+            {/* Search and Filter Controls for Orders */}
+            <Card className="bg-blue-50 border-blue-200">
+              <CardContent className="p-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <Label htmlFor="orderSearch" className="text-sm font-medium text-gray-700">Search Orders</Label>
+                    <Input
+                      id="orderSearch"
+                      placeholder="Search by customer name, order ID..."
+                      value={searchFilters.orders}
+                      onChange={(e) => setSearchFilters(prev => ({...prev, orders: e.target.value}))}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Status Filter</Label>
+                    <Select value={statusFilter} onValueChange={(value: 'all' | 'pending' | 'completed') => setStatusFilter(value)}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="pending">Pending Only</SelectItem>
+                        <SelectItem value="completed">Completed Only</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Price Type</Label>
+                    <Select value={priceTypeFilter} onValueChange={(value: 'all' | 'retail' | 'wholesale') => setPriceTypeFilter(value)}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Types</SelectItem>
+                        <SelectItem value="retail">🏪 Retail Only</SelectItem>
+                        <SelectItem value="wholesale">🏭 Wholesale Only</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-end">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        setSearchFilters(prev => ({...prev, orders: ''}));
+                        setStatusFilter('all');
+                        setPriceTypeFilter('all');
+                      }}
+                      className="w-full"
+                    >
+                      Clear Filters
+                    </Button>
+                  </div>
+                </div>
+                <div className="mt-2 text-xs text-gray-600">
+                  Showing {getFilteredOrders().length} of {orders.length} orders
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Order Form Modal */}
             {showOrderForm && (
               <Card className="border-blue-200 bg-blue-50">
@@ -746,7 +854,7 @@ export default function PaymentTracker() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {orders.slice().reverse().map(order => (
+                    {getFilteredOrders().slice().reverse().map(order => (
                       <TableRow key={order.id}>
                         <TableCell>{PaymentDataManager.formatDate(order.createdAt)}</TableCell>
                         <TableCell className="font-medium">{order.customerName}</TableCell>
@@ -790,10 +898,10 @@ export default function PaymentTracker() {
                         </TableCell>
                       </TableRow>
                     ))}
-                    {orders.length === 0 && (
+                    {getFilteredOrders().length === 0 && (
                       <TableRow>
                         <TableCell colSpan={8} className="text-center py-8 text-gray-500">
-                          No orders yet. Create your first order!
+                          {orders.length === 0 ? "No orders yet. Create your first order!" : "No orders match your search criteria."}
                         </TableCell>
                       </TableRow>
                     )}
@@ -815,6 +923,37 @@ export default function PaymentTracker() {
                 Add Income
               </Button>
             </div>
+
+            {/* Search Controls for Income */}
+            <Card className="bg-green-50 border-green-200">
+              <CardContent className="p-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="incomeSearch" className="text-sm font-medium text-gray-700">Search Income Entries</Label>
+                    <Input
+                      id="incomeSearch"
+                      placeholder="Search by customer name, order size, remarks..."
+                      value={searchFilters.income}
+                      onChange={(e) => setSearchFilters(prev => ({...prev, income: e.target.value}))}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setSearchFilters(prev => ({...prev, income: ''}))}
+                      className="w-full"
+                    >
+                      Clear Search
+                    </Button>
+                  </div>
+                </div>
+                <div className="mt-2 text-xs text-gray-600">
+                  Showing {getFilteredIncome().length} of {incomeEntries.length} income entries
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Income Form Modal */}
             {showIncomeForm && (
@@ -935,7 +1074,7 @@ export default function PaymentTracker() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {incomeEntries.slice().reverse().map(entry => (
+                    {getFilteredIncome().slice().reverse().map(entry => (
                       <TableRow key={entry.id}>
                         <TableCell>{PaymentDataManager.formatDate(entry.date)}</TableCell>
                         <TableCell className="font-medium">{entry.customerName}</TableCell>
@@ -959,10 +1098,10 @@ export default function PaymentTracker() {
                         </TableCell>
                       </TableRow>
                     ))}
-                    {incomeEntries.length === 0 && (
+                    {getFilteredIncome().length === 0 && (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                          No income entries yet. Add your first income entry!
+                          {incomeEntries.length === 0 ? "No income entries yet. Add your first income entry!" : "No income entries match your search criteria."}
                         </TableCell>
                       </TableRow>
                     )}
@@ -984,6 +1123,53 @@ export default function PaymentTracker() {
                 Add Expense
               </Button>
             </div>
+
+            {/* Search and Filter Controls for Expenses */}
+            <Card className="bg-red-50 border-red-200">
+              <CardContent className="p-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="expenseSearch" className="text-sm font-medium text-gray-700">Search Expenses</Label>
+                    <Input
+                      id="expenseSearch"
+                      placeholder="Search by item name, remarks..."
+                      value={searchFilters.expenses}
+                      onChange={(e) => setSearchFilters(prev => ({...prev, expenses: e.target.value}))}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Expense Type</Label>
+                    <Select value={expenseTypeFilter} onValueChange={(value: 'all' | 'business' | 'extra') => setExpenseTypeFilter(value)}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Expenses</SelectItem>
+                        <SelectItem value="business">Business Only</SelectItem>
+                        <SelectItem value="extra">Extra Only</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-end">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        setSearchFilters(prev => ({...prev, expenses: ''}));
+                        setExpenseTypeFilter('all');
+                      }}
+                      className="w-full"
+                    >
+                      Clear Filters
+                    </Button>
+                  </div>
+                </div>
+                <div className="mt-2 text-xs text-gray-600">
+                  Showing {getFilteredExpenses().length} of {expenseEntries.length} expense entries
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Expense Form Modal */}
             {showExpenseForm && (
@@ -1091,7 +1277,7 @@ export default function PaymentTracker() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {expenseEntries.slice().reverse().map(entry => (
+                    {getFilteredExpenses().slice().reverse().map(entry => (
                       <TableRow key={entry.id}>
                         <TableCell>{PaymentDataManager.formatDate(entry.date)}</TableCell>
                         <TableCell className="font-medium">{entry.item}</TableCell>
@@ -1126,10 +1312,10 @@ export default function PaymentTracker() {
                         </TableCell>
                       </TableRow>
                     ))}
-                    {expenseEntries.length === 0 && (
+                    {getFilteredExpenses().length === 0 && (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                          No expense entries yet. Add your first expense entry!
+                          {expenseEntries.length === 0 ? "No expense entries yet. Add your first expense entry!" : "No expense entries match your search criteria."}
                         </TableCell>
                       </TableRow>
                     )}
