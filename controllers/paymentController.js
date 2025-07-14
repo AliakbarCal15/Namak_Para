@@ -1,17 +1,10 @@
 
 const Payment = require('../models/paymentModel');
 
-// Create payment
+// Create new payment
 const createPayment = async (req, res) => {
   try {
-    const { customerName, amount, date } = req.body;
-    
-    const payment = new Payment({
-      customerName,
-      amount,
-      date: date || new Date()
-    });
-
+    const payment = new Payment(req.body);
     const savedPayment = await payment.save();
     res.status(201).json(savedPayment);
   } catch (error) {
@@ -22,7 +15,9 @@ const createPayment = async (req, res) => {
 // Get all payments
 const getPayments = async (req, res) => {
   try {
-    const payments = await Payment.find().sort({ date: -1 });
+    const payments = await Payment.find()
+      .populate('orderId', 'customerName totalAmount')
+      .sort({ date: -1 });
     res.json(payments);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -32,7 +27,7 @@ const getPayments = async (req, res) => {
 // Get payment by ID
 const getPaymentById = async (req, res) => {
   try {
-    const payment = await Payment.findById(req.params.id);
+    const payment = await Payment.findById(req.params.id).populate('orderId');
     if (!payment) {
       return res.status(404).json({ error: 'Payment not found' });
     }

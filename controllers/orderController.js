@@ -1,18 +1,10 @@
 
 const Order = require('../models/orderModel');
 
-// Create order
+// Create new order
 const createOrder = async (req, res) => {
   try {
-    const { customerName, size, quantity, date } = req.body;
-    
-    const order = new Order({
-      customerName,
-      size,
-      quantity,
-      date: date || new Date()
-    });
-
+    const order = new Order(req.body);
     const savedOrder = await order.save();
     res.status(201).json(savedOrder);
   } catch (error) {
@@ -23,7 +15,7 @@ const createOrder = async (req, res) => {
 // Get all orders
 const getOrders = async (req, res) => {
   try {
-    const orders = await Order.find().sort({ date: -1 });
+    const orders = await Order.find().sort({ deliveryDate: -1 });
     res.json(orders);
   } catch (error) {
     res.status(500).json({ error: error.message });

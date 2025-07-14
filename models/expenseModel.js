@@ -2,7 +2,7 @@
 const mongoose = require('mongoose');
 
 const expenseSchema = new mongoose.Schema({
-  itemName: {
+  item: {
     type: String,
     required: true
   },
@@ -18,6 +18,15 @@ const expenseSchema = new mongoose.Schema({
   isExtra: {
     type: Boolean,
     default: false
+  },
+  category: {
+    type: String,
+    enum: ['raw_material', 'gas', 'packaging', 'transport', 'other'],
+    default: 'raw_material'
+  },
+  remarks: {
+    type: String,
+    default: ''
   }
 }, {
   timestamps: true

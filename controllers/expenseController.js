@@ -1,18 +1,10 @@
 
 const Expense = require('../models/expenseModel');
 
-// Create expense
+// Create new expense
 const createExpense = async (req, res) => {
   try {
-    const { itemName, amount, date, isExtra } = req.body;
-    
-    const expense = new Expense({
-      itemName,
-      amount,
-      date: date || new Date(),
-      isExtra: isExtra || false
-    });
-
+    const expense = new Expense(req.body);
     const savedExpense = await expense.save();
     res.status(201).json(savedExpense);
   } catch (error) {
