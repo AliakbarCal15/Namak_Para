@@ -1490,8 +1490,17 @@ function ProductPricingSection({ showSuccess, showError }: ProductPricingSection
 
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {CONFIG.PACKET_SIZES.map(size => {
-          const currentPrices = sellingPrices[priceType] || sellingPrices.retail;
-          const currentPrice = currentPrices[size] || 0;
+          // Safe pricing access - consistent defensive programming pattern
+          let currentPrice = 0;
+          if (sellingPrices && typeof sellingPrices === 'object') {
+            const currentPrices = sellingPrices[priceType] || sellingPrices.retail || {};
+            currentPrice = currentPrices[size] || 0;
+          }
+          
+          // Fallback calculation if price not found
+          if (currentPrice === 0) {
+            currentPrice = priceType === 'wholesale' ? (size * 0.2) : (size * 0.25);
+          }
           
           return (
             <div 
@@ -1852,9 +1861,22 @@ function ProfitContent() {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4" key={`package-${refreshKey}`}>
             {CONFIG.PACKET_SIZES.map(size => {
-              // Show both retail and wholesale profit analysis
-              const retailPrice = currentPrices.retail?.[size] || 0;
-              const wholesalePrice = currentPrices.wholesale?.[size] || 0;
+              // Show both retail and wholesale profit analysis - Safe access pattern
+              let retailPrice = 0;
+              let wholesalePrice = 0;
+              
+              if (currentPrices && typeof currentPrices === 'object') {
+                retailPrice = currentPrices.retail?.[size] || 0;
+                wholesalePrice = currentPrices.wholesale?.[size] || 0;
+              }
+              
+              // Fallback calculation if prices not found
+              if (retailPrice === 0) {
+                retailPrice = size * 0.25; // Default retail calculation
+              }
+              if (wholesalePrice === 0) {
+                wholesalePrice = size * 0.2; // Default wholesale calculation  
+              }
               
               // Real cost calculation using current material prices
               const requirements = BusinessCalculator.calculateMaterialRequirements(size);
