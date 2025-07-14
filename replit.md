@@ -1,8 +1,8 @@
-# Bakery Business Management System
+# Payment Tracker System
 
 ## Overview
 
-This is a comprehensive Namak Para business management suite built with React, TypeScript, and localStorage. The application provides complete business management tools including order management, material tracking with editable pricing, profit calculations, and forecasting capabilities. Features real-time editable pricing for both raw materials and product selling prices.
+This is a simplified payment tracking application built with React, TypeScript, and localStorage. The application provides easy income and expense tracking for small businesses with manual entry forms and profit calculations. Features clean interface for tracking daily business income and expenses without complex order management or material calculations.
 
 ## User Preferences
 
@@ -36,43 +36,36 @@ The application follows a modern full-stack architecture with clear separation b
 
 ## Key Components
 
-### 1. Order Management System
-- Customer order tracking with delivery dates
-- Package-based ordering (50g, 100g, etc.)
-- Automatic weight and pricing calculations
-- Order status management and history
+### 1. Income Tracking (IN-TAKE)
+- Manual entry of customer payments
+- Fields: Customer Name, Amount, Date, Order Size (optional), Remarks
+- Simple table view of all income entries
+- Delete functionality for corrections
 
-### 2. Material Tracking
-- Raw material inventory (Maida, Oil, Gas, Salt, Ajwain)
-- Usage tracking with date-based entries
-- Automatic yield calculations (material to product conversion)
-- Cost tracking per material
+### 2. Expense Tracking (OUT-TAKE)
+- Manual entry of business expenses (materials, supplies, etc.)
+- Fields: Item, Amount, Date, Remarks
+- Mark expenses as "Extra" to exclude from profit calculation
+- Toggle between Business/Extra expense types
 
-### 3. Profit Calculator
-- Real-time profit margin calculations
-- Material cost vs. selling price analysis
-- Daily/monthly profit reporting
-- Break-even analysis
+### 3. Profit Calculation
+- Total Income: Sum of all income entries
+- Total Expense: Sum of business expenses (excluding "Extra" marked items)
+- Net Profit: Total Income - Total Expense
+- Extra Expenses: Separate tracking for non-business costs
 
-### 4. Payment Tracking
-- Customer payment history
-- Outstanding payment tracking
-- Payment method recording
-- Financial reporting
-
-### 5. Business Forecasting
-- Sales trend analysis
-- Material requirement predictions
-- Revenue forecasting
-- Seasonal pattern recognition
+### 4. Summary Dashboard
+- Real-time calculation cards showing totals
+- Color-coded profit/loss indicators
+- Simple tabbed interface for income vs expense views
 
 ## Data Flow
 
-1. **Client Requests**: Frontend makes API calls to `/api/*` endpoints
-2. **Server Processing**: Express.js routes handle business logic
-3. **Database Operations**: Drizzle ORM manages PostgreSQL interactions
-4. **Response Handling**: TanStack Query manages client-side data caching
-5. **UI Updates**: React components re-render based on state changes
+1. **User Input**: Manual entry forms for income and expense data
+2. **localStorage Storage**: All data stored locally in browser storage
+3. **Real-time Updates**: State management triggers UI re-renders
+4. **Calculations**: Simple arithmetic for profit/loss calculations
+5. **Display**: Tables and summary cards show current data state
 
 ## External Dependencies
 
