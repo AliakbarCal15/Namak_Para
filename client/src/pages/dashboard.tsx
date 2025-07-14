@@ -1061,33 +1061,30 @@ function OrderForm({ onClose, onSuccess, onError }: OrderFormProps) {
                   required
                 />
               </div>
-              <div className="border-2 border-dashed border-primary/30 p-4 rounded-lg bg-yellow-50">
-                <Label className="text-base font-bold text-primary">🎯 Pricing Type * (यहाँ Toggle देखें)</Label>
-                <div className="flex items-center justify-center space-x-4 mt-3">
+              <div>
+                <Label className="text-sm font-medium">Pricing Type *</Label>
+                <div className="flex items-center space-x-2 mt-2">
                   <Button
                     type="button"
                     variant={priceType === 'retail' ? 'default' : 'outline'}
-                    size="lg"
+                    size="sm"
                     onClick={() => setPriceType('retail')}
-                    className={`${priceType === 'retail' ? 'bg-green-600 hover:bg-green-700 text-white' : 'border-green-600 text-green-600 hover:bg-green-50'} font-bold text-lg px-6 py-3 shadow-lg`}
+                    className={priceType === 'retail' ? 'bg-green-600 hover:bg-green-700' : ''}
                   >
-                    🏪 RETAIL
+                    🏪 Retail
                   </Button>
-                  <div className="text-gray-400 text-xl">या</div>
                   <Button
                     type="button"
                     variant={priceType === 'wholesale' ? 'default' : 'outline'}
-                    size="lg"
+                    size="sm"
                     onClick={() => setPriceType('wholesale')}
-                    className={`${priceType === 'wholesale' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'border-blue-600 text-blue-600 hover:bg-blue-50'} font-bold text-lg px-6 py-3 shadow-lg`}
+                    className={priceType === 'wholesale' ? 'bg-blue-600 hover:bg-blue-700' : ''}
                   >
-                    🏭 WHOLESALE
+                    🏭 Wholesale
                   </Button>
                 </div>
-                <div className="text-center text-sm font-medium text-gray-700 mt-2 p-2 bg-white rounded">
-                  Selected: <span className={`${priceType === 'wholesale' ? 'text-blue-600' : 'text-green-600'} font-bold`}>
-                    {priceType === 'wholesale' ? '🏭 WHOLESALE - Lower rates for bulk orders' : '🏪 RETAIL - Standard customer rates'}
-                  </span>
+                <div className="text-xs text-gray-500 mt-1">
+                  {priceType === 'wholesale' ? 'Lower rates for bulk orders' : 'Standard customer rates'}
                 </div>
               </div>
             </div>
@@ -1468,34 +1465,26 @@ function ProductPricingSection({ showSuccess, showError }: ProductPricingSection
 
   return (
     <div className="space-y-4">
-      {/* Toggle for Retail/Wholesale - SUPER VISIBLE */}
-      <div className="border-2 border-dashed border-amber-400 p-4 rounded-lg bg-amber-50">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-          <h3 className="text-lg font-bold text-amber-800">🎯 Product Selling Prices (Click to Edit) - यहाँ भी Toggle है!</h3>
-          <div className="flex items-center space-x-3">
-            <Button
-              variant={priceType === 'retail' ? 'default' : 'outline'}
-              size="lg"
-              onClick={() => setPriceType('retail')}
-              className={`${priceType === 'retail' ? 'bg-green-600 hover:bg-green-700 text-white' : 'border-green-600 text-green-600 hover:bg-green-50'} font-bold text-sm px-4 py-2 shadow-lg`}
-            >
-              🏪 RETAIL PRICES
-            </Button>
-            <div className="text-amber-600 font-bold">या</div>
-            <Button
-              variant={priceType === 'wholesale' ? 'default' : 'outline'}
-              size="lg"
-              onClick={() => setPriceType('wholesale')}
-              className={`${priceType === 'wholesale' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'border-blue-600 text-blue-600 hover:bg-blue-50'} font-bold text-sm px-4 py-2 shadow-lg`}
-            >
-              🏭 WHOLESALE PRICES
-            </Button>
-          </div>
-        </div>
-        <div className="text-center text-sm font-medium text-amber-700 mt-2">
-          Currently editing: <span className={`${priceType === 'wholesale' ? 'text-blue-600' : 'text-green-600'} font-bold`}>
-            {priceType === 'wholesale' ? '🏭 WHOLESALE PRICES' : '🏪 RETAIL PRICES'}
-          </span>
+      {/* Toggle for Retail/Wholesale */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Product Selling Prices (Click to Edit)</h3>
+        <div className="flex items-center space-x-2">
+          <Button
+            variant={priceType === 'retail' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setPriceType('retail')}
+            className={priceType === 'retail' ? 'bg-green-600 hover:bg-green-700' : ''}
+          >
+            🏪 Retail
+          </Button>
+          <Button
+            variant={priceType === 'wholesale' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setPriceType('wholesale')}
+            className={priceType === 'wholesale' ? 'bg-blue-600 hover:bg-blue-700' : ''}
+          >
+            🏭 Wholesale
+          </Button>
         </div>
       </div>
 
