@@ -257,13 +257,37 @@ export default function PaymentTracker() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [incomeEntries, setIncomeEntries] = useState<IncomeEntry[]>([]);
   const [expenseEntries, setExpenseEntries] = useState<ExpenseEntry[]>([]);
+  
+  // Pricing management states
+  const [showPricingModal, setShowPricingModal] = useState(false);
+  const [currentPrices, setCurrentPrices] = useState<{ retail: { [key: number]: number }, wholesale: { [key: number]: number } }>({
+    retail: {},
+    wholesale: {}
+  });
 
   // Load data on mount and refresh
   useEffect(() => {
     setOrders(PaymentDataManager.getOrders());
     setIncomeEntries(PaymentDataManager.getIncomeEntries());
     setExpenseEntries(PaymentDataManager.getExpenseEntries());
+    setCurrentPrices(PaymentDataManager.getSellingPrices());
   }, [refreshKey]);
+
+  // Handle pricing updates
+  const handlePriceUpdate = (type: 'retail' | 'wholesale', size: number, newPrice: number) => {
+    if (newPrice < 0) return;
+    
+    const updatedPrices = {
+      ...currentPrices,
+      [type]: {
+        ...currentPrices[type],
+        [size]: newPrice
+      }
+    };
+    
+    setCurrentPrices(updatedPrices);
+    PaymentDataManager.saveSellingPrices(updatedPrices);
+  };
 
   // Calculate totals
   const totalIncome = incomeEntries.reduce((sum, entry) => sum + entry.amount, 0);
@@ -463,9 +487,18 @@ export default function PaymentTracker() {
       <div className="max-w-6xl mx-auto space-y-6">
         
         {/* Header */}
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">💰 Payment Tracker</h1>
-          <p className="text-gray-600">Simple income and expense tracking for your business</p>
+        <div className="flex justify-between items-center mb-6">
+          <div className="text-center flex-1">
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">💰 Payment Tracker + Order Management</h1>
+            <p className="text-gray-600">Simple income and expense tracking for your business</p>
+          </div>
+          <Button 
+            onClick={() => setShowPricingModal(true)}
+            variant="outline"
+            className="border-blue-300 text-blue-700 hover:bg-blue-50"
+          >
+            ⚙️ Edit Pricing
+          </Button>
         </div>
 
         {/* Summary Cards */}
@@ -1106,6 +1139,154 @@ export default function PaymentTracker() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Pricing Management Modal */}
+        {showPricingModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <CardTitle className="text-xl font-bold text-gray-800">
+                    ⚙️ Edit Product Pricing
+                  </CardTitle>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => setShowPricingModal(false)}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+                <p className="text-gray-600">Set prices for different packet sizes. Changes will apply to new orders.</p>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                
+                {/* Retail Pricing Section */}
+                <div>
+                  <h3 className="text-lg font-semibold text-green-700 mb-4">🏪 Retail Pricing</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                    {CONFIG.PACKET_SIZES.map(size => (
+                      <Card key={`retail-${size}`} className="border-green-200 bg-green-50">
+                        <CardContent className="p-4 text-center">
+                          <h4 className="font-semibold text-gray-800 mb-3">{size}g Packet</h4>
+                          <div className="space-y-2">
+                            <Label htmlFor={`retail-${size}`} className="text-xs text-gray-600">
+                              Price per packet (₹)
+                            </Label>
+                            <Input
+                              id={`retail-${size}`}
+                              type="number"
+                              min="0"
+                              step="0.5"
+                              value={currentPrices.retail?.[size] || ''}
+                              onChange={(e) => handlePriceUpdate('retail', size, parseFloat(e.target.value) || 0)}
+                              className="text-center font-semibold"
+                              placeholder="0"
+                            />
+                            <div className="text-xs text-green-700">
+                              Rate per gram: ₹{((currentPrices.retail?.[size] || 0) / size).toFixed(2)}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Wholesale Pricing Section */}
+                <div>
+                  <h3 className="text-lg font-semibold text-blue-700 mb-4">🏭 Wholesale Pricing</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                    {CONFIG.PACKET_SIZES.map(size => (
+                      <Card key={`wholesale-${size}`} className="border-blue-200 bg-blue-50">
+                        <CardContent className="p-4 text-center">
+                          <h4 className="font-semibold text-gray-800 mb-3">{size}g Packet</h4>
+                          <div className="space-y-2">
+                            <Label htmlFor={`wholesale-${size}`} className="text-xs text-gray-600">
+                              Price per packet (₹)
+                            </Label>
+                            <Input
+                              id={`wholesale-${size}`}
+                              type="number"
+                              min="0"
+                              step="0.5"
+                              value={currentPrices.wholesale?.[size] || ''}
+                              onChange={(e) => handlePriceUpdate('wholesale', size, parseFloat(e.target.value) || 0)}
+                              className="text-center font-semibold"
+                              placeholder="0"
+                            />
+                            <div className="text-xs text-blue-700">
+                              Rate per gram: ₹{((currentPrices.wholesale?.[size] || 0) / size).toFixed(2)}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Quick Actions */}
+                <div className="border-t pt-6">
+                  <h4 className="font-semibold text-gray-800 mb-4">Quick Actions</h4>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const updatedPrices = { ...currentPrices };
+                        CONFIG.PACKET_SIZES.forEach(size => {
+                          if (updatedPrices.retail[size] > 0) {
+                            updatedPrices.wholesale[size] = Math.round(updatedPrices.retail[size] * 0.8);
+                          }
+                        });
+                        setCurrentPrices(updatedPrices);
+                        PaymentDataManager.saveSellingPrices(updatedPrices);
+                      }}
+                      className="border-blue-300 text-blue-700"
+                    >
+                      Set Wholesale = 80% of Retail
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const updatedPrices = { ...currentPrices };
+                        CONFIG.PACKET_SIZES.forEach(size => {
+                          if (updatedPrices.retail[size] > 0) {
+                            updatedPrices.wholesale[size] = Math.round(updatedPrices.retail[size] * 0.75);
+                          }
+                        });
+                        setCurrentPrices(updatedPrices);
+                        PaymentDataManager.saveSellingPrices(updatedPrices);
+                      }}
+                      className="border-blue-300 text-blue-700"
+                    >
+                      Set Wholesale = 75% of Retail
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-2 pt-4 border-t">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowPricingModal(false)}
+                  >
+                    Close
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setShowPricingModal(false);
+                      setRefreshKey(prev => prev + 1);
+                    }}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    Save & Apply
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   );
