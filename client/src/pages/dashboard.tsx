@@ -49,6 +49,7 @@ interface Order {
   totalWeight: number;
   totalAmount: number;
   status: 'pending' | 'completed';
+  priceType: 'retail' | 'wholesale'; // नया field for pricing type
   createdAt: string;
 }
 
@@ -123,8 +124,9 @@ const CONFIG = {
 // ==========================================
 
 class DataManager {
-  // Initialize करने पर default materials set करते हैं
+  // Initialize करने पर default materials set करते हैं और data migration भी करते हैं
   static initializeDefaultData() {
+    // Initialize materials if not exists
     if (!DataManager.getMaterials().length) {
       DataManager.saveMaterials([
         { id: 1, name: 'Maida', unit: 'kg', pricePerUnit: 45, stock: 0 },
@@ -133,6 +135,21 @@ class DataManager {
         { id: 4, name: 'Ajwain', unit: 'kg', pricePerUnit: 7, stock: 0 },
         { id: 5, name: 'Gas', unit: 'per kg production', pricePerUnit: 25, stock: 0 }
       ]);
+    }
+    
+    // Migrate existing orders to include priceType field
+    const orders = DataManager.getOrders();
+    let needsUpdate = false;
+    const updatedOrders = orders.map(order => {
+      if (!order.priceType) {
+        needsUpdate = true;
+        return { ...order, priceType: 'retail' as const }; // Default to retail for existing orders
+      }
+      return order;
+    });
+    
+    if (needsUpdate) {
+      DataManager.saveOrders(updatedOrders);
     }
   }
 
@@ -146,19 +163,37 @@ class DataManager {
     }
   }
 
-  // Product pricing management - selling prices को localStorage में store करते हैं
+  // Product pricing management - selling prices को localStorage में store करते हैं (wholesale + retail)
   static getSellingPrices() {
+    const defaultPrices = {
+      retail: {
+        50: 15,   // 50g = ₹15
+        100: 25,  // 100g = ₹25
+        250: 70,  // 250g = ₹70
+        500: 100, // 500g = ₹100
+        1000: 250 // 1kg = ₹250
+      },
+      wholesale: {
+        50: 12,   // 50g = ₹12 (20% less)
+        100: 20,  // 100g = ₹20 (20% less)
+        250: 56,  // 250g = ₹56 (20% less)
+        500: 80,  // 500g = ₹80 (20% less)
+        1000: 200 // 1kg = ₹200 (20% less)
+      }
+    };
+    
     const stored = localStorage.getItem('namakpara_selling_prices');
-    return stored ? JSON.parse(stored) : CONFIG.DEFAULT_SELLING_PRICES;
+    return stored ? JSON.parse(stored) : defaultPrices;
   }
 
-  static saveSellingPrices(prices: { [key: number]: number }) {
+  static saveSellingPrices(prices: { retail: { [key: number]: number }, wholesale: { [key: number]: number } }) {
     localStorage.setItem('namakpara_selling_prices', JSON.stringify(prices));
   }
 
-  static updateSellingPrice(size: number, newPrice: number) {
+  static updateSellingPrice(type: 'retail' | 'wholesale', size: number, newPrice: number) {
     const prices = DataManager.getSellingPrices();
-    prices[size] = newPrice;
+    if (!prices[type]) prices[type] = {};
+    prices[type][size] = newPrice;
     DataManager.saveSellingPrices(prices);
   }
 
@@ -761,6 +796,7 @@ function OrdersContent({ showOrderForm, setShowOrderForm, showSuccess, showError
                   <TableHead>Order Date</TableHead>
                   <TableHead>Delivery Date</TableHead>
                   <TableHead>Weight</TableHead>
+                  <TableHead>Price Type</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -775,6 +811,15 @@ function OrdersContent({ showOrderForm, setShowOrderForm, showSuccess, showError
                     <TableCell>{DataManager.formatDate(order.createdAt)}</TableCell>
                     <TableCell>{DataManager.formatDate(order.deliveryDate)}</TableCell>
                     <TableCell>{order.totalWeight}g</TableCell>
+                    <TableCell>
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        order.priceType === 'wholesale' 
+                          ? 'bg-blue-100 text-blue-800' 
+                          : 'bg-green-100 text-green-800'
+                      }`}>
+                        {order.priceType === 'wholesale' ? '🏭 Wholesale' : '🏪 Retail'}
+                      </span>
+                    </TableCell>
                     <TableCell className="font-semibold text-green-600">
                       {DataManager.formatCurrency(order.totalAmount)}
                     </TableCell>
@@ -801,7 +846,7 @@ function OrdersContent({ showOrderForm, setShowOrderForm, showSuccess, showError
                 ))}
                 {filteredOrders.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-gray-500 py-8">
+                    <TableCell colSpan={8} className="text-center text-gray-500 py-8">
                       {orders.length === 0 ? 'No orders yet. Create your first order!' : 'No orders match your search criteria.'}
                     </TableCell>
                   </TableRow>
@@ -829,6 +874,7 @@ function OrderForm({ onClose, onSuccess, onError }: OrderFormProps) {
   const [customerName, setCustomerName] = useState('');
   const [deliveryDate, setDeliveryDate] = useState('');
   const [packages, setPackages] = useState<{ [key: number]: number }>({});
+  const [priceType, setPriceType] = useState<'retail' | 'wholesale'>('retail');
   const [currentPrices, setCurrentPrices] = useState(DataManager.getSellingPrices());
 
   // Set tomorrow as default delivery date
@@ -845,17 +891,18 @@ function OrderForm({ onClose, onSuccess, onError }: OrderFormProps) {
     }));
   };
 
-  // Calculate order summary in real-time using dynamic pricing
+  // Calculate order summary in real-time using dynamic pricing and selected price type
   const calculateSummary = () => {
     let totalWeight = 0;
     let totalPackets = 0;
     let totalAmount = 0;
-    const currentPrices = DataManager.getSellingPrices();
+    const allPrices = DataManager.getSellingPrices();
+    const selectedPrices = allPrices[priceType] || allPrices.retail;
 
     CONFIG.PACKET_SIZES.forEach(size => {
       const qty = packages[size] || 0;
       const weight = size * qty;
-      const pricePerPacket = currentPrices[size] || 0;
+      const pricePerPacket = selectedPrices[size] || 0;
       const amount = pricePerPacket * qty;
 
       totalWeight += weight;
@@ -886,13 +933,14 @@ function OrderForm({ onClose, onSuccess, onError }: OrderFormProps) {
       return;
     }
 
-    // Create package items array with current pricing
-    const currentPrices = DataManager.getSellingPrices();
+    // Create package items array with current pricing and selected price type
+    const allPrices = DataManager.getSellingPrices();
+    const selectedPrices = allPrices[priceType] || allPrices.retail;
     const packageItems: PackageItem[] = CONFIG.PACKET_SIZES
       .filter(size => packages[size] > 0)
       .map(size => {
         const qty = packages[size];
-        const pricePerPacket = currentPrices[size] || 0;
+        const pricePerPacket = selectedPrices[size] || 0;
         return {
           size,
           quantity: qty,
@@ -907,6 +955,7 @@ function OrderForm({ onClose, onSuccess, onError }: OrderFormProps) {
       packages: packageItems,
       totalWeight: summary.totalWeight,
       totalAmount: summary.totalAmount,
+      priceType, // नया field for pricing type
       status: 'pending' as const
     };
 
@@ -936,7 +985,7 @@ function OrderForm({ onClose, onSuccess, onError }: OrderFormProps) {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Basic Order Info */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <Label htmlFor="customerName">Customer Name *</Label>
                 <Input
@@ -957,35 +1006,69 @@ function OrderForm({ onClose, onSuccess, onError }: OrderFormProps) {
                   required
                 />
               </div>
+              <div>
+                <Label className="text-sm font-medium">Pricing Type *</Label>
+                <div className="flex items-center space-x-2 mt-2">
+                  <Button
+                    type="button"
+                    variant={priceType === 'retail' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setPriceType('retail')}
+                    className={priceType === 'retail' ? 'bg-green-600 hover:bg-green-700' : ''}
+                  >
+                    🏪 Retail
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={priceType === 'wholesale' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setPriceType('wholesale')}
+                    className={priceType === 'wholesale' ? 'bg-blue-600 hover:bg-blue-700' : ''}
+                  >
+                    🏭 Wholesale
+                  </Button>
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  {priceType === 'wholesale' ? 'Lower rates for bulk orders' : 'Standard customer rates'}
+                </div>
+              </div>
             </div>
 
             {/* Package Selection */}
             <div>
-              <Label className="text-base font-semibold">Select Packages</Label>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-3">
-                {CONFIG.PACKET_SIZES.map(size => (
-                  <Card key={size} className="p-4">
-                    <div className="text-center">
-                      <h4 className="font-semibold text-gray-800 mb-2">{size}g Packets</h4>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={packages[size] || ''}
-                        onChange={(e) => updatePackageQuantity(size, parseInt(e.target.value) || 0)}
-                        placeholder="Quantity"
-                        className="text-center mb-2"
-                      />
-                      <div className="text-xs text-gray-500">
-                        Rate: ₹{currentPrices[size]}/packet
-                      </div>
-                      {packages[size] > 0 && (
-                        <div className="text-xs text-primary font-medium mt-1">
-                          Total: {DataManager.formatCurrency(currentPrices[size] * packages[size])}
+              <Label className="text-base font-semibold">
+                Select Packages ({priceType === 'wholesale' ? '🏭 Wholesale' : '🏪 Retail'} Rates)
+              </Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mt-3">
+                {CONFIG.PACKET_SIZES.map(size => {
+                  const allPrices = DataManager.getSellingPrices();
+                  const selectedPrices = allPrices[priceType] || allPrices.retail;
+                  const currentRate = selectedPrices[size] || 0;
+                  
+                  return (
+                    <Card key={size} className={`p-3 ${priceType === 'wholesale' ? 'border-blue-200 bg-blue-50' : 'border-green-200 bg-green-50'}`}>
+                      <div className="text-center">
+                        <h4 className="font-semibold text-gray-800 mb-2">{size}g Packets</h4>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={packages[size] || ''}
+                          onChange={(e) => updatePackageQuantity(size, parseInt(e.target.value) || 0)}
+                          placeholder="Qty"
+                          className="text-center mb-2 h-8"
+                        />
+                        <div className={`text-xs ${priceType === 'wholesale' ? 'text-blue-700' : 'text-green-700'} font-medium`}>
+                          Rate: ₹{currentRate}/packet
                         </div>
-                      )}
-                    </div>
-                  </Card>
-                ))}
+                        {packages[size] > 0 && (
+                          <div className="text-xs text-primary font-bold mt-1">
+                            Total: {DataManager.formatCurrency(currentRate * packages[size])}
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+                  );
+                })}
               </div>
             </div>
 
@@ -1287,20 +1370,22 @@ function ProductPricingSection({ showSuccess, showError }: ProductPricingSection
   const [sellingPrices, setSellingPrices] = useState(DataManager.getSellingPrices());
   const [editingSize, setEditingSize] = useState<number | null>(null);
   const [tempPrice, setTempPrice] = useState('');
+  const [priceType, setPriceType] = useState<'retail' | 'wholesale'>('retail');
 
   const startEdit = (size: number) => {
     setEditingSize(size);
-    setTempPrice(sellingPrices[size].toString());
+    const currentPrices = sellingPrices[priceType] || sellingPrices.retail;
+    setTempPrice(currentPrices[size]?.toString() || '0');
   };
 
   const savePrice = () => {
     if (editingSize !== null) {
       const newPrice = parseFloat(tempPrice);
       if (newPrice > 0) {
-        DataManager.updateSellingPrice(editingSize, newPrice);
+        DataManager.updateSellingPrice(priceType, editingSize, newPrice);
         setSellingPrices(DataManager.getSellingPrices());
         setEditingSize(null);
-        showSuccess(`✅ Price updated for ${editingSize}g packets!`);
+        showSuccess(`✅ ${priceType} price updated for ${editingSize}g packets!`);
       } else {
         showError('कृपया सही price enter करें!');
       }
@@ -1313,50 +1398,85 @@ function ProductPricingSection({ showSuccess, showError }: ProductPricingSection
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-      {CONFIG.PACKET_SIZES.map(size => (
-        <div key={size} className="p-4 border rounded-lg hover:bg-gray-50">
-          <div className="text-center">
-            <div className="text-lg font-semibold text-gray-700 mb-2">
-              {size}g Packet
-            </div>
-            
-            {editingSize === size ? (
-              <div className="space-y-2">
-                <Input
-                  type="number"
-                  value={tempPrice}
-                  onChange={(e) => setTempPrice(e.target.value)}
-                  className="text-center h-8"
-                  min="0"
-                  step="1"
-                  autoFocus
-                />
-                <div className="flex gap-1 justify-center">
-                  <Button size="sm" onClick={savePrice} className="h-7 px-2">
-                    <CheckCircle className="w-3 h-3" />
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={cancelEdit} className="h-7 px-2">
-                    <X className="w-3 h-3" />
-                  </Button>
+    <div className="space-y-4">
+      {/* Toggle for Retail/Wholesale */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Product Selling Prices (Click to Edit)</h3>
+        <div className="flex items-center space-x-2">
+          <Button
+            variant={priceType === 'retail' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setPriceType('retail')}
+            className={priceType === 'retail' ? 'bg-green-600 hover:bg-green-700' : ''}
+          >
+            🏪 Retail
+          </Button>
+          <Button
+            variant={priceType === 'wholesale' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setPriceType('wholesale')}
+            className={priceType === 'wholesale' ? 'bg-blue-600 hover:bg-blue-700' : ''}
+          >
+            🏭 Wholesale
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        {CONFIG.PACKET_SIZES.map(size => {
+          const currentPrices = sellingPrices[priceType] || sellingPrices.retail;
+          const currentPrice = currentPrices[size] || 0;
+          
+          return (
+            <div 
+              key={size} 
+              className={`p-4 border rounded-lg hover:bg-gray-50 ${priceType === 'wholesale' ? 'border-blue-200 bg-blue-50' : 'border-green-200 bg-green-50'}`}
+            >
+              <div className="text-center">
+                <div className="text-lg font-semibold text-gray-700 mb-2">
+                  {size}g Packet
+                </div>
+                
+                {editingSize === size ? (
+                  <div className="space-y-2">
+                    <Input
+                      type="number"
+                      value={tempPrice}
+                      onChange={(e) => setTempPrice(e.target.value)}
+                      className="text-center h-8"
+                      min="0"
+                      step="1"
+                      autoFocus
+                    />
+                    <div className="flex gap-1 justify-center">
+                      <Button size="sm" onClick={savePrice} className="h-7 px-2">
+                        <CheckCircle className="w-3 h-3" />
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={cancelEdit} className="h-7 px-2">
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    className={`text-xl font-bold cursor-pointer hover:bg-opacity-80 px-3 py-2 rounded transition-colors ${
+                      priceType === 'wholesale' ? 'text-blue-700 hover:bg-blue-700 hover:text-white' : 'text-green-700 hover:bg-green-700 hover:text-white'
+                    }`}
+                    onClick={() => startEdit(size)}
+                    title="Click to edit price"
+                  >
+                    ₹{currentPrice}
+                  </div>
+                )}
+                
+                <div className="text-xs text-gray-500 mt-1">
+                  {priceType} price
                 </div>
               </div>
-            ) : (
-              <div
-                className="text-xl font-bold text-primary cursor-pointer hover:bg-primary hover:text-white px-3 py-2 rounded transition-colors"
-                onClick={() => startEdit(size)}
-                title="Click to edit price"
-              >
-                ₹{sellingPrices[size]}
-              </div>
-            )}
-            
-            <div className="text-xs text-gray-500 mt-1">
-              per packet
             </div>
-          </div>
-        </div>
-      ))}
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1666,58 +1786,63 @@ function ProfitContent() {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4" key={`package-${refreshKey}`}>
             {CONFIG.PACKET_SIZES.map(size => {
-              // Real-time selling price from current settings
-              const sellingPrice = currentPrices[size] || 0;
+              // Show both retail and wholesale profit analysis
+              const retailPrice = currentPrices.retail?.[size] || 0;
+              const wholesalePrice = currentPrices.wholesale?.[size] || 0;
               
               // Real cost calculation using current material prices
               const requirements = BusinessCalculator.calculateMaterialRequirements(size);
               const realCostPrice = BusinessCalculator.calculateProductionCost(requirements);
               
-              const profit = sellingPrice - realCostPrice;
-              const profitPercent = sellingPrice > 0 ? (profit / sellingPrice * 100) : 0;
+              const retailProfit = retailPrice - realCostPrice;
+              const wholesaleProfit = wholesalePrice - realCostPrice;
+              const retailMargin = retailPrice > 0 ? (retailProfit / retailPrice * 100) : 0;
+              const wholesaleMargin = wholesalePrice > 0 ? (wholesaleProfit / wholesalePrice * 100) : 0;
               
               return (
-                <Card key={size} className={`${profit >= 0 ? 'border-green-200' : 'border-red-200'}`}>
+                <Card key={size} className="border-gray-200">
                   <CardContent className="p-3 text-center">
                     <h4 className="font-semibold text-gray-800 mb-2">{size}g Packet</h4>
-                    <div className="space-y-1 text-xs">
-                      <div className="flex justify-between">
-                        <span>Selling:</span>
-                        <span className="font-medium text-green-700">{DataManager.formatCurrency(sellingPrice)}</span>
-                      </div>
-                      <div className="flex justify-between">
+                    <div className="space-y-2 text-xs">
+                      <div className="flex justify-between border-b pb-1">
                         <span>Cost:</span>
                         <span className="font-medium text-red-700">{DataManager.formatCurrency(realCostPrice)}</span>
                       </div>
-                      <div className="flex justify-between border-t pt-1 font-semibold">
-                        <span>Profit:</span>
-                        <span className={profit >= 0 ? 'text-green-600' : 'text-red-600'}>
-                          {DataManager.formatCurrency(profit)}
-                        </span>
-                      </div>
-                      <div className={`text-xs font-medium ${profitPercent >= 20 ? 'text-green-600' : profitPercent >= 10 ? 'text-yellow-600' : 'text-red-600'}`}>
-                        {profitPercent.toFixed(1)}% margin
+                      
+                      {/* Retail Analysis */}
+                      <div className="bg-green-50 p-2 rounded">
+                        <div className="font-medium text-green-800 mb-1">🏪 Retail</div>
+                        <div className="flex justify-between">
+                          <span>Price:</span>
+                          <span className="font-medium">{DataManager.formatCurrency(retailPrice)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Profit:</span>
+                          <span className={retailProfit >= 0 ? 'text-green-600' : 'text-red-600'}>
+                            {DataManager.formatCurrency(retailProfit)}
+                          </span>
+                        </div>
+                        <div className="text-xs font-medium text-green-700">
+                          {retailMargin.toFixed(1)}% margin
+                        </div>
                       </div>
                       
-                      {/* Profit status indicator */}
-                      <div className="mt-2">
-                        {profitPercent >= 20 ? (
-                          <div className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
-                            Excellent
-                          </div>
-                        ) : profitPercent >= 10 ? (
-                          <div className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs">
-                            Good
-                          </div>
-                        ) : profitPercent >= 0 ? (
-                          <div className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs">
-                            Low
-                          </div>
-                        ) : (
-                          <div className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs">
-                            Loss
-                          </div>
-                        )}
+                      {/* Wholesale Analysis */}
+                      <div className="bg-blue-50 p-2 rounded">
+                        <div className="font-medium text-blue-800 mb-1">🏭 Wholesale</div>
+                        <div className="flex justify-between">
+                          <span>Price:</span>
+                          <span className="font-medium">{DataManager.formatCurrency(wholesalePrice)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Profit:</span>
+                          <span className={wholesaleProfit >= 0 ? 'text-green-600' : 'text-red-600'}>
+                            {DataManager.formatCurrency(wholesaleProfit)}
+                          </span>
+                        </div>
+                        <div className="text-xs font-medium text-blue-700">
+                          {wholesaleMargin.toFixed(1)}% margin
+                        </div>
                       </div>
                     </div>
                   </CardContent>
