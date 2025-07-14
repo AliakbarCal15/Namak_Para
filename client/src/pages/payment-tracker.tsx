@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,10 +28,10 @@ interface Order {
 }
 
 interface PackageItem {
-  size: number; // packet size in grams (50g, 100g, etc.)
-  quantity: number; // number of packets
-  weight: number; // total weight for this package type
-  amount: number; // total amount for this package type
+  size: number;
+  quantity: number;
+  weight: number;
+  amount: number;
 }
 
 interface IncomeEntry {
@@ -40,7 +41,7 @@ interface IncomeEntry {
   date: string;
   orderSize?: string;
   remarks?: string;
-  orderId?: string; // Link to order if payment is for specific order
+  orderId?: string;
   createdAt: string;
 }
 
@@ -50,15 +51,15 @@ interface ExpenseEntry {
   amount: number;
   date: string;
   remarks?: string;
-  isExtra: boolean; // Extra expenses won't count in profit calculation
+  isExtra: boolean;
   createdAt: string;
 }
 
 // Configuration constants
 const CONFIG = {
-  PACKET_SIZES: [50, 100, 250, 500, 1000], // Available packet sizes in grams
-  YIELD_RATIO: 1.4, // 1kg material produces 1.4kg finished product
-  GAS_COST_PER_MINUTE: 0.5 // Gas cost per minute of cooking
+  PACKET_SIZES: [50, 100, 250, 500, 1000],
+  YIELD_RATIO: 1.4,
+  GAS_COST_PER_MINUTE: 0.5
 };
 
 // ==========================================
@@ -104,22 +105,22 @@ class PaymentDataManager {
     }
   }
 
-  // Product pricing management - selling prices को localStorage में store करते हैं (wholesale + retail)
+  // Product pricing management
   static getSellingPrices() {
     const defaultPrices = {
       retail: {
-        50: 15,   // 50g = ₹15
-        100: 25,  // 100g = ₹25
-        250: 70,  // 250g = ₹70
-        500: 100, // 500g = ₹100
-        1000: 250 // 1kg = ₹250
+        50: 15,
+        100: 25,
+        250: 70,
+        500: 100,
+        1000: 250
       },
       wholesale: {
-        50: 12,   // 50g = ₹12 (20% less)
-        100: 20,  // 100g = ₹20 (20% less)
-        250: 56,  // 250g = ₹56 (20% less)
-        500: 80,  // 500g = ₹80 (20% less)
-        1000: 200 // 1kg = ₹200 (20% less)
+        50: 12,
+        100: 20,
+        250: 56,
+        500: 80,
+        1000: 200
       }
     };
     
@@ -232,7 +233,7 @@ export default function PaymentTracker() {
     packages: {} as { [key: number]: number }
   });
 
-  // Income form states
+  // *** FIXED: Income form states - properly initialized ***
   const [showIncomeForm, setShowIncomeForm] = useState(false);
   const [incomeForm, setIncomeForm] = useState({
     customerName: '',
@@ -240,7 +241,7 @@ export default function PaymentTracker() {
     date: new Date().toISOString().split('T')[0],
     orderSize: '',
     remarks: '',
-    orderId: ''
+    orderId: 'no-order' // *** FIX: Default value instead of empty string ***
   });
 
   // Expense form states
@@ -275,12 +276,21 @@ export default function PaymentTracker() {
   const [priceTypeFilter, setPriceTypeFilter] = useState<'all' | 'retail' | 'wholesale'>('all');
   const [expenseTypeFilter, setExpenseTypeFilter] = useState<'all' | 'business' | 'extra'>('all');
 
-  // Load data on mount and refresh
+  // *** FIXED: Load data with proper error handling ***
   useEffect(() => {
-    setOrders(PaymentDataManager.getOrders());
-    setIncomeEntries(PaymentDataManager.getIncomeEntries());
-    setExpenseEntries(PaymentDataManager.getExpenseEntries());
-    setCurrentPrices(PaymentDataManager.getSellingPrices());
+    try {
+      setOrders(PaymentDataManager.getOrders());
+      setIncomeEntries(PaymentDataManager.getIncomeEntries());
+      setExpenseEntries(PaymentDataManager.getExpenseEntries());
+      setCurrentPrices(PaymentDataManager.getSellingPrices());
+    } catch (error) {
+      console.error('Error loading data:', error);
+      // Set default values if error occurs
+      setOrders([]);
+      setIncomeEntries([]);
+      setExpenseEntries([]);
+      setCurrentPrices({ retail: {}, wholesale: {} });
+    }
   }, [refreshKey]);
 
   // Handle pricing updates
@@ -346,7 +356,7 @@ export default function PaymentTracker() {
     .reduce((sum, entry) => sum + entry.amount, 0);
   const profit = totalIncome - totalExpense;
 
-  // Calculate order summary for safe pricing access
+  // *** FIXED: Calculate order summary with proper error handling ***
   const calculateOrderSummary = (packages: { [key: number]: number }, priceType: 'retail' | 'wholesale') => {
     let totalWeight = 0;
     let totalPackets = 0;
@@ -359,7 +369,6 @@ export default function PaymentTracker() {
       if (allPrices && typeof allPrices === 'object') {
         selectedPrices = allPrices[priceType] || allPrices.retail || {};
       } else {
-        // Fallback default prices
         selectedPrices = {
           50: priceType === 'wholesale' ? 12 : 15,
           100: priceType === 'wholesale' ? 20 : 25,
@@ -410,7 +419,6 @@ export default function PaymentTracker() {
       return;
     }
 
-    // Create package items array
     const allPrices = PaymentDataManager.getSellingPrices();
     let selectedPrices;
     
@@ -467,7 +475,7 @@ export default function PaymentTracker() {
     setRefreshKey(prev => prev + 1);
   };
 
-  // Handle income form submission
+  // *** FIXED: Handle income form submission with proper validation ***
   const handleIncomeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -476,27 +484,40 @@ export default function PaymentTracker() {
       return;
     }
 
-    PaymentDataManager.addIncomeEntry({
-      customerName: incomeForm.customerName.trim(),
-      amount: parseFloat(incomeForm.amount),
-      date: incomeForm.date,
-      orderSize: incomeForm.orderSize.trim() || undefined,
-      remarks: incomeForm.remarks.trim() || undefined,
-      orderId: incomeForm.orderId.trim() || undefined
-    });
+    const amountValue = parseFloat(incomeForm.amount);
+    if (isNaN(amountValue) || amountValue <= 0) {
+      alert('कृपया valid Amount भरें!');
+      return;
+    }
 
-    // Reset form
-    setIncomeForm({
-      customerName: '',
-      amount: '',
-      date: new Date().toISOString().split('T')[0],
-      orderSize: '',
-      remarks: '',
-      orderId: ''
-    });
-    
-    setShowIncomeForm(false);
-    setRefreshKey(prev => prev + 1);
+    try {
+      PaymentDataManager.addIncomeEntry({
+        customerName: incomeForm.customerName.trim(),
+        amount: amountValue,
+        date: incomeForm.date,
+        orderSize: incomeForm.orderSize.trim() || undefined,
+        remarks: incomeForm.remarks.trim() || undefined,
+        orderId: incomeForm.orderId === 'no-order' ? undefined : incomeForm.orderId.trim()
+      });
+
+      // Reset form to default values
+      setIncomeForm({
+        customerName: '',
+        amount: '',
+        date: new Date().toISOString().split('T')[0],
+        orderSize: '',
+        remarks: '',
+        orderId: 'no-order'
+      });
+      
+      setShowIncomeForm(false);
+      setRefreshKey(prev => prev + 1);
+      
+      alert('✅ Income entry जोड़ा गया!');
+    } catch (error) {
+      console.error('Error adding income:', error);
+      alert('❌ Income add करने में error आया!');
+    }
   };
 
   // Handle expense form submission
@@ -508,25 +529,38 @@ export default function PaymentTracker() {
       return;
     }
 
-    PaymentDataManager.addExpenseEntry({
-      item: expenseForm.item.trim(),
-      amount: parseFloat(expenseForm.amount),
-      date: expenseForm.date,
-      remarks: expenseForm.remarks.trim() || undefined,
-      isExtra: expenseForm.isExtra
-    });
+    const amountValue = parseFloat(expenseForm.amount);
+    if (isNaN(amountValue) || amountValue <= 0) {
+      alert('कृपया valid Amount भरें!');
+      return;
+    }
 
-    // Reset form
-    setExpenseForm({
-      item: '',
-      amount: '',
-      date: new Date().toISOString().split('T')[0],
-      remarks: '',
-      isExtra: false
-    });
-    
-    setShowExpenseForm(false);
-    setRefreshKey(prev => prev + 1);
+    try {
+      PaymentDataManager.addExpenseEntry({
+        item: expenseForm.item.trim(),
+        amount: amountValue,
+        date: expenseForm.date,
+        remarks: expenseForm.remarks.trim() || undefined,
+        isExtra: expenseForm.isExtra
+      });
+
+      // Reset form
+      setExpenseForm({
+        item: '',
+        amount: '',
+        date: new Date().toISOString().split('T')[0],
+        remarks: '',
+        isExtra: false
+      });
+      
+      setShowExpenseForm(false);
+      setRefreshKey(prev => prev + 1);
+      
+      alert('✅ Expense entry जोड़ा गया!');
+    } catch (error) {
+      console.error('Error adding expense:', error);
+      alert('❌ Expense add करने में error आया!');
+    }
   };
 
   return (
@@ -911,7 +945,7 @@ export default function PaymentTracker() {
             </Card>
           </TabsContent>
 
-          {/* Income Tab */}
+          {/* *** FIXED: Income Tab with proper Select handling *** */}
           <TabsContent value="intake" className="space-y-4">
             <div className="flex justify-between items-center">
               <h2 className="text-xl font-semibold text-gray-800">Income Entries</h2>
@@ -955,7 +989,7 @@ export default function PaymentTracker() {
               </CardContent>
             </Card>
 
-            {/* Income Form Modal */}
+            {/* *** FIXED: Income Form Modal with proper Select handling *** */}
             {showIncomeForm && (
               <Card className="border-green-200 bg-green-50">
                 <CardHeader>
@@ -964,7 +998,18 @@ export default function PaymentTracker() {
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      onClick={() => setShowIncomeForm(false)}
+                      onClick={() => {
+                        setShowIncomeForm(false);
+                        // Reset form when closing
+                        setIncomeForm({
+                          customerName: '',
+                          amount: '',
+                          date: new Date().toISOString().split('T')[0],
+                          orderSize: '',
+                          remarks: '',
+                          orderId: 'no-order'
+                        });
+                      }}
                     >
                       <X className="w-4 h-4" />
                     </Button>
@@ -1017,12 +1062,17 @@ export default function PaymentTracker() {
                       </div>
                       <div>
                         <Label htmlFor="linkedOrder">Link to Order (Optional)</Label>
-                        <Select value={incomeForm.orderId} onValueChange={(value) => setIncomeForm(prev => ({...prev, orderId: value}))}>
+                        {/* *** FIXED: Select component with proper value handling *** */}
+                        <Select 
+                          value={incomeForm.orderId} 
+                          onValueChange={(value) => setIncomeForm(prev => ({...prev, orderId: value}))}
+                        >
                           <SelectTrigger>
                             <SelectValue placeholder="Select order..." />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">No Order Link</SelectItem>
+                            {/* *** FIX: Proper SelectItem with non-empty value *** */}
+                            <SelectItem value="no-order">No Order Link</SelectItem>
                             {orders.map(order => (
                               <SelectItem key={order.id} value={order.id}>
                                 {order.customerName} - {PaymentDataManager.formatCurrency(order.totalAmount)} ({PaymentDataManager.formatDate(order.createdAt)})
@@ -1049,7 +1099,18 @@ export default function PaymentTracker() {
                       <Button 
                         type="button" 
                         variant="outline" 
-                        onClick={() => setShowIncomeForm(false)}
+                        onClick={() => {
+                          setShowIncomeForm(false);
+                          // Reset form when canceling
+                          setIncomeForm({
+                            customerName: '',
+                            amount: '',
+                            date: new Date().toISOString().split('T')[0],
+                            orderSize: '',
+                            remarks: '',
+                            orderId: 'no-order'
+                          });
+                        }}
                       >
                         Cancel
                       </Button>
@@ -1088,8 +1149,10 @@ export default function PaymentTracker() {
                             variant="ghost"
                             size="sm"
                             onClick={() => {
-                              PaymentDataManager.deleteIncomeEntry(entry.id);
-                              setRefreshKey(prev => prev + 1);
+                              if (confirm('क्या आप इस income entry को delete करना चाहते हैं?')) {
+                                PaymentDataManager.deleteIncomeEntry(entry.id);
+                                setRefreshKey(prev => prev + 1);
+                              }
                             }}
                             className="text-red-600 hover:text-red-700"
                           >
@@ -1302,8 +1365,10 @@ export default function PaymentTracker() {
                             variant="ghost"
                             size="sm"
                             onClick={() => {
-                              PaymentDataManager.deleteExpenseEntry(entry.id);
-                              setRefreshKey(prev => prev + 1);
+                              if (confirm('क्या आप इस expense entry को delete करना चाहते हैं?')) {
+                                PaymentDataManager.deleteExpenseEntry(entry.id);
+                                setRefreshKey(prev => prev + 1);
+                              }
                             }}
                             className="text-red-600 hover:text-red-700"
                           >
