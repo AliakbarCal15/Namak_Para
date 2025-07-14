@@ -1,8 +1,8 @@
 
-const Expense = require('../models/expenseModel');
+import Expense from '../models/expenseModel.js';
 
 // Create new expense
-const createExpense = async (req, res) => {
+export const createExpense = async (req, res) => {
   try {
     const expense = new Expense(req.body);
     const savedExpense = await expense.save();
@@ -13,7 +13,7 @@ const createExpense = async (req, res) => {
 };
 
 // Get all expenses
-const getExpenses = async (req, res) => {
+export const getExpenses = async (req, res) => {
   try {
     const expenses = await Expense.find().sort({ date: -1 });
     res.json(expenses);
@@ -23,7 +23,7 @@ const getExpenses = async (req, res) => {
 };
 
 // Get expense by ID
-const getExpenseById = async (req, res) => {
+export const getExpenseById = async (req, res) => {
   try {
     const expense = await Expense.findById(req.params.id);
     if (!expense) {
@@ -36,7 +36,7 @@ const getExpenseById = async (req, res) => {
 };
 
 // Update expense
-const updateExpense = async (req, res) => {
+export const updateExpense = async (req, res) => {
   try {
     const expense = await Expense.findByIdAndUpdate(
       req.params.id,
@@ -55,7 +55,7 @@ const updateExpense = async (req, res) => {
 };
 
 // Delete expense
-const deleteExpense = async (req, res) => {
+export const deleteExpense = async (req, res) => {
   try {
     const expense = await Expense.findByIdAndDelete(req.params.id);
     
@@ -67,12 +67,4 @@ const deleteExpense = async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
-};
-
-module.exports = {
-  createExpense,
-  getExpenses,
-  getExpenseById,
-  updateExpense,
-  deleteExpense
 };

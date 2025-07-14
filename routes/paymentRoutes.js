@@ -1,13 +1,14 @@
 
-const express = require('express');
-const router = express.Router();
-const {
+import express from 'express';
+import {
   createPayment,
   getPayments,
   getPaymentById,
   updatePayment,
   deletePayment
-} = require('../controllers/paymentController');
+} from '../controllers/paymentController.js';
+
+const router = express.Router();
 
 // POST /api/payments - Create new payment
 router.post('/', createPayment);
@@ -24,4 +25,4 @@ router.put('/:id', updatePayment);
 // DELETE /api/payments/:id - Delete payment
 router.delete('/:id', deletePayment);
 
-module.exports = router;
+export default router;

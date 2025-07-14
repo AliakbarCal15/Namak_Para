@@ -1,8 +1,8 @@
 
-const Order = require('../models/orderModel');
+import Order from '../models/orderModel.js';
 
 // Create new order
-const createOrder = async (req, res) => {
+export const createOrder = async (req, res) => {
   try {
     const order = new Order(req.body);
     const savedOrder = await order.save();
@@ -13,7 +13,7 @@ const createOrder = async (req, res) => {
 };
 
 // Get all orders
-const getOrders = async (req, res) => {
+export const getOrders = async (req, res) => {
   try {
     const orders = await Order.find().sort({ deliveryDate: -1 });
     res.json(orders);
@@ -23,7 +23,7 @@ const getOrders = async (req, res) => {
 };
 
 // Get order by ID
-const getOrderById = async (req, res) => {
+export const getOrderById = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order) {
@@ -36,7 +36,7 @@ const getOrderById = async (req, res) => {
 };
 
 // Update order
-const updateOrder = async (req, res) => {
+export const updateOrder = async (req, res) => {
   try {
     const order = await Order.findByIdAndUpdate(
       req.params.id,
@@ -55,7 +55,7 @@ const updateOrder = async (req, res) => {
 };
 
 // Delete order
-const deleteOrder = async (req, res) => {
+export const deleteOrder = async (req, res) => {
   try {
     const order = await Order.findByIdAndDelete(req.params.id);
     
@@ -67,12 +67,4 @@ const deleteOrder = async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
-};
-
-module.exports = {
-  createOrder,
-  getOrders,
-  getOrderById,
-  updateOrder,
-  deleteOrder
 };
