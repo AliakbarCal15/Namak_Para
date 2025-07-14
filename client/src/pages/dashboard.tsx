@@ -892,23 +892,54 @@ function OrderForm({ onClose, onSuccess, onError }: OrderFormProps) {
   };
 
   // Calculate order summary in real-time using dynamic pricing and selected price type
+  // Safe calculation with proper null checks - defensive programming approach
   const calculateSummary = () => {
     let totalWeight = 0;
     let totalPackets = 0;
     let totalAmount = 0;
-    const allPrices = DataManager.getSellingPrices();
-    const selectedPrices = allPrices[priceType] || allPrices.retail;
+    
+    try {
+      const allPrices = DataManager.getSellingPrices();
+      
+      // Safe access with multiple fallbacks - यहाँ safe access pattern use कर रहे हैं
+      let selectedPrices;
+      if (allPrices && typeof allPrices === 'object') {
+        selectedPrices = allPrices[priceType] || allPrices.retail || {};
+      } else {
+        // Fallback default prices if data structure is corrupted
+        selectedPrices = {
+          50: priceType === 'wholesale' ? 12 : 15,
+          100: priceType === 'wholesale' ? 20 : 25,
+          250: priceType === 'wholesale' ? 56 : 70,
+          500: priceType === 'wholesale' ? 80 : 100,
+          1000: priceType === 'wholesale' ? 200 : 250
+        };
+      }
 
-    CONFIG.PACKET_SIZES.forEach(size => {
-      const qty = packages[size] || 0;
-      const weight = size * qty;
-      const pricePerPacket = selectedPrices[size] || 0;
-      const amount = pricePerPacket * qty;
+      CONFIG.PACKET_SIZES.forEach(size => {
+        const qty = packages[size] || 0;
+        const weight = size * qty;
+        
+        // Safe price access with fallback calculation
+        let pricePerPacket = 0;
+        if (selectedPrices && selectedPrices[size]) {
+          pricePerPacket = selectedPrices[size];
+        } else {
+          // Fallback calculation if price not found
+          pricePerPacket = priceType === 'wholesale' ? (size * 0.2) : (size * 0.25);
+        }
+        
+        const amount = pricePerPacket * qty;
 
-      totalWeight += weight;
-      totalPackets += qty;
-      totalAmount += amount;
-    });
+        totalWeight += weight;
+        totalPackets += qty;
+        totalAmount += amount;
+      });
+    } catch (error) {
+      console.error('Error in calculateSummary:', error);
+      // Return safe defaults on error
+      return { totalWeight: 0, totalPackets: 0, totalAmount: 0 };
+    }
 
     return { totalWeight, totalPackets, totalAmount };
   };
@@ -934,13 +965,37 @@ function OrderForm({ onClose, onSuccess, onError }: OrderFormProps) {
     }
 
     // Create package items array with current pricing and selected price type
+    // Safe pricing access - same defensive pattern as calculateSummary
     const allPrices = DataManager.getSellingPrices();
-    const selectedPrices = allPrices[priceType] || allPrices.retail;
+    let selectedPrices;
+    
+    if (allPrices && typeof allPrices === 'object') {
+      selectedPrices = allPrices[priceType] || allPrices.retail || {};
+    } else {
+      // Fallback default prices if data structure is corrupted
+      selectedPrices = {
+        50: priceType === 'wholesale' ? 12 : 15,
+        100: priceType === 'wholesale' ? 20 : 25,
+        250: priceType === 'wholesale' ? 56 : 70,
+        500: priceType === 'wholesale' ? 80 : 100,
+        1000: priceType === 'wholesale' ? 200 : 250
+      };
+    }
+    
     const packageItems: PackageItem[] = CONFIG.PACKET_SIZES
       .filter(size => packages[size] > 0)
       .map(size => {
         const qty = packages[size];
-        const pricePerPacket = selectedPrices[size] || 0;
+        
+        // Safe price access with fallback
+        let pricePerPacket = 0;
+        if (selectedPrices && selectedPrices[size]) {
+          pricePerPacket = selectedPrices[size];
+        } else {
+          // Fallback calculation if price not found
+          pricePerPacket = priceType === 'wholesale' ? (size * 0.2) : (size * 0.25);
+        }
+        
         return {
           size,
           quantity: qty,
@@ -1041,9 +1096,20 @@ function OrderForm({ onClose, onSuccess, onError }: OrderFormProps) {
               </Label>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mt-3">
                 {CONFIG.PACKET_SIZES.map(size => {
+                  // Safe pricing access - consistent with calculateSummary function
                   const allPrices = DataManager.getSellingPrices();
-                  const selectedPrices = allPrices[priceType] || allPrices.retail;
-                  const currentRate = selectedPrices[size] || 0;
+                  let selectedPrices;
+                  let currentRate = 0;
+                  
+                  if (allPrices && typeof allPrices === 'object') {
+                    selectedPrices = allPrices[priceType] || allPrices.retail || {};
+                    currentRate = selectedPrices[size] || 0;
+                  }
+                  
+                  // Fallback calculation if price not found
+                  if (currentRate === 0) {
+                    currentRate = priceType === 'wholesale' ? (size * 0.2) : (size * 0.25);
+                  }
                   
                   return (
                     <Card key={size} className={`p-3 ${priceType === 'wholesale' ? 'border-blue-200 bg-blue-50' : 'border-green-200 bg-green-50'}`}>
