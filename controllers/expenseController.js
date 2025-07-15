@@ -4,10 +4,19 @@ import Expense from '../models/expenseModel.js';
 // Create new expense
 export const createExpense = async (req, res) => {
   try {
+    console.log('🟢 Expense CREATE Request Body:', req.body);
+    console.log('🟢 Expense CREATE Request Headers:', req.headers);
+    
     const expense = new Expense(req.body);
     const savedExpense = await expense.save();
+    
+    console.log('✅ Expense SAVED to MongoDB:', savedExpense);
+    console.log('📊 Expense Collection Count:', await Expense.countDocuments());
+    
     res.status(201).json(savedExpense);
   } catch (error) {
+    console.error('❌ Expense CREATE Error:', error.message);
+    console.error('❌ Full Error:', error);
     res.status(400).json({ error: error.message });
   }
 };
