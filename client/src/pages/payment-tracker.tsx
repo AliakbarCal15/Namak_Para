@@ -23,7 +23,7 @@ interface Order {
   totalWeight: number;
   totalAmount: number;
   status: 'pending' | 'completed';
-  priceType: 'retail' | 'wholesale';
+  productVariant: 'sada' | 'peri-peri' | 'cheese';
   createdAt: string;
 }
 
@@ -59,68 +59,214 @@ interface ExpenseEntry {
 const CONFIG = {
   PACKET_SIZES: [50, 100, 250, 500, 1000],
   YIELD_RATIO: 1.4,
-  GAS_COST_PER_MINUTE: 0.5
+  GAS_COST_PER_MINUTE: 0.5,
+  PRODUCT_VARIANTS: {
+    'sada': 'Sada Namak Para',
+    'peri-peri': 'Peri Peri Namak Para', 
+    'cheese': 'Cheese Namak Para'
+  }
 };
 
 // ==========================================
-// 🗄️ DATA MANAGER CLASS (localStorage based)
+// 🌐 API INTEGRATION HELPER FUNCTIONS
+// ==========================================
+
+const API_BASE_URL = 'http://localhost:5000/api';
+
+// API Helper Functions
+const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
+  try {
+    console.log(`🌐 API Request: ${options.method || 'GET'} ${endpoint}`);
+    if (options.body) {
+      console.log('📤 Request Body:', JSON.parse(options.body as string));
+    }
+    
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+      ...options,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('📥 API Response:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ API Error:', error);
+    throw error;
+  }
+};
+
+// Orders API
+const ordersApi = {
+  getAll: () => apiRequest('/orders'),
+  create: (orderData: any) => apiRequest('/orders', {
+    method: 'POST',
+    body: JSON.stringify(orderData),
+  }),
+  update: (id: string, orderData: any) => apiRequest(`/orders/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(orderData),
+  }),
+  delete: (id: string) => apiRequest(`/orders/${id}`, {
+    method: 'DELETE',
+  }),
+};
+
+// Payments API
+const paymentsApi = {
+  getAll: () => apiRequest('/payments'),
+  create: (paymentData: any) => apiRequest('/payments', {
+    method: 'POST',
+    body: JSON.stringify(paymentData),
+  }),
+  update: (id: string, paymentData: any) => apiRequest(`/payments/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(paymentData),
+  }),
+  delete: (id: string) => apiRequest(`/payments/${id}`, {
+    method: 'DELETE',
+  }),
+};
+
+// Expenses API
+const expensesApi = {
+  getAll: () => apiRequest('/expenses'),
+  create: (expenseData: any) => apiRequest('/expenses', {
+    method: 'POST',
+    body: JSON.stringify(expenseData),
+  }),
+  update: (id: string, expenseData: any) => apiRequest(`/expenses/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(expenseData),
+  }),
+  delete: (id: string) => apiRequest(`/expenses/${id}`, {
+    method: 'DELETE',
+  }),
+};
+
+// ==========================================
+// 🗄️ DATA MANAGER CLASS (API + localStorage hybrid)
 // ==========================================
 
 class PaymentDataManager {
-  // Orders management
-  static getOrders(): Order[] {
-    const stored = localStorage.getItem('payment_tracker_orders');
-    return stored ? JSON.parse(stored) : [];
-  }
-
-  static saveOrders(orders: Order[]) {
-    localStorage.setItem('payment_tracker_orders', JSON.stringify(orders));
-  }
-
-  static addOrder(order: Omit<Order, 'id' | 'createdAt'>): Order {
-    const orders = PaymentDataManager.getOrders();
-    const newOrder: Order = {
-      ...order,
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
-      createdAt: new Date().toISOString()
-    };
-    
-    orders.push(newOrder);
-    PaymentDataManager.saveOrders(orders);
-    return newOrder;
-  }
-
-  static deleteOrder(id: string) {
-    const orders = PaymentDataManager.getOrders();
-    const filtered = orders.filter(order => order.id !== id);
-    PaymentDataManager.saveOrders(filtered);
-  }
-
-  static updateOrderStatus(id: string, status: 'pending' | 'completed') {
-    const orders = PaymentDataManager.getOrders();
-    const order = orders.find(o => o.id === id);
-    if (order) {
-      order.status = status;
-      PaymentDataManager.saveOrders(orders);
+  // Orders management - API + localStorage hybrid
+  static async getOrders(): Promise<Order[]> {
+    try {
+      const apiOrders = await ordersApi.getAll();
+      return apiOrders.map((order: any) => ({
+        id: order._id,
+        customerName: order.customerName,
+        deliveryDate: order.deliveryDate,
+        packages: order.packages || [],
+        totalWeight: order.totalWeight,
+        totalAmount: order.totalAmount,
+        status: order.status,
+        productVariant: order.productVariant || 'sada',
+        createdAt: order.createdAt || order.date
+      }));
+    } catch (error) {
+      console.error('❌ Failed to fetch orders from API, using localStorage:', error);
+      const stored = localStorage.getItem('payment_tracker_orders');
+      return stored ? JSON.parse(stored) : [];
     }
   }
 
-  // Product pricing management
+  static async addOrder(order: Omit<Order, 'id' | 'createdAt'>): Promise<Order> {
+    try {
+      const orderData = {
+        customerName: order.customerName,
+        deliveryDate: order.deliveryDate,
+        packages: order.packages,
+        totalWeight: order.totalWeight,
+        totalAmount: order.totalAmount,
+        status: order.status,
+        productVariant: order.productVariant,
+        date: new Date().toISOString()
+      };
+
+      const createdOrder = await ordersApi.create(orderData);
+      
+      return {
+        id: createdOrder._id,
+        customerName: createdOrder.customerName,
+        deliveryDate: createdOrder.deliveryDate,
+        packages: createdOrder.packages || [],
+        totalWeight: createdOrder.totalWeight,
+        totalAmount: createdOrder.totalAmount,
+        status: createdOrder.status,
+        productVariant: createdOrder.productVariant || 'sada',
+        createdAt: createdOrder.createdAt || createdOrder.date
+      };
+    } catch (error) {
+      console.error('❌ Failed to create order via API, using localStorage:', error);
+      // Fallback to localStorage
+      const orders = await PaymentDataManager.getOrders();
+      const newOrder: Order = {
+        ...order,
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+        createdAt: new Date().toISOString()
+      };
+      
+      orders.push(newOrder);
+      localStorage.setItem('payment_tracker_orders', JSON.stringify(orders));
+      return newOrder;
+    }
+  }
+
+  static async deleteOrder(id: string): Promise<void> {
+    try {
+      await ordersApi.delete(id);
+    } catch (error) {
+      console.error('❌ Failed to delete order via API, using localStorage:', error);
+      const orders = await PaymentDataManager.getOrders();
+      const filtered = orders.filter(order => order.id !== id);
+      localStorage.setItem('payment_tracker_orders', JSON.stringify(filtered));
+    }
+  }
+
+  static async updateOrderStatus(id: string, status: 'pending' | 'completed'): Promise<void> {
+    try {
+      await ordersApi.update(id, { status });
+    } catch (error) {
+      console.error('❌ Failed to update order via API, using localStorage:', error);
+      const orders = await PaymentDataManager.getOrders();
+      const order = orders.find(o => o.id === id);
+      if (order) {
+        order.status = status;
+        localStorage.setItem('payment_tracker_orders', JSON.stringify(orders));
+      }
+    }
+  }
+
+  // Product pricing management with variants
   static getSellingPrices() {
     const defaultPrices = {
-      retail: {
+      'sada': {
         50: 15,
         100: 25,
-        250: 70,
+        250: 50,
         500: 100,
-        1000: 250
-      },
-      wholesale: {
-        50: 12,
-        100: 20,
-        250: 56,
-        500: 80,
         1000: 200
+      },
+      'peri-peri': {
+        50: 20,
+        100: 30,
+        250: 75,
+        500: 150,
+        1000: 275
+      },
+      'cheese': {
+        50: 20,
+        100: 30,
+        250: 75,
+        500: 150,
+        1000: 275
       }
     };
     
@@ -139,70 +285,160 @@ class PaymentDataManager {
     PaymentDataManager.saveSellingPrices(prices);
   }
 
-  // Income entries management
-  static getIncomeEntries(): IncomeEntry[] {
-    const stored = localStorage.getItem('payment_tracker_income');
-    return stored ? JSON.parse(stored) : [];
+  // Income entries management - API + localStorage hybrid
+  static async getIncomeEntries(): Promise<IncomeEntry[]> {
+    try {
+      const apiPayments = await paymentsApi.getAll();
+      return apiPayments.map((payment: any) => ({
+        id: payment._id,
+        customerName: payment.customerName,
+        amount: payment.amount,
+        date: payment.date,
+        orderSize: payment.orderSize,
+        remarks: payment.remarks,
+        orderId: payment.orderId,
+        createdAt: payment.createdAt || payment.date
+      }));
+    } catch (error) {
+      console.error('❌ Failed to fetch payments from API, using localStorage:', error);
+      const stored = localStorage.getItem('payment_tracker_income');
+      return stored ? JSON.parse(stored) : [];
+    }
   }
 
-  static saveIncomeEntries(entries: IncomeEntry[]) {
-    localStorage.setItem('payment_tracker_income', JSON.stringify(entries));
+  static async addIncomeEntry(entry: Omit<IncomeEntry, 'id' | 'createdAt'>): Promise<IncomeEntry> {
+    try {
+      const paymentData = {
+        customerName: entry.customerName,
+        amount: entry.amount,
+        date: entry.date,
+        orderSize: entry.orderSize,
+        remarks: entry.remarks,
+        orderId: entry.orderId
+      };
+
+      const createdPayment = await paymentsApi.create(paymentData);
+      
+      return {
+        id: createdPayment._id,
+        customerName: createdPayment.customerName,
+        amount: createdPayment.amount,
+        date: createdPayment.date,
+        orderSize: createdPayment.orderSize,
+        remarks: createdPayment.remarks,
+        orderId: createdPayment.orderId,
+        createdAt: createdPayment.createdAt || createdPayment.date
+      };
+    } catch (error) {
+      console.error('❌ Failed to create payment via API, using localStorage:', error);
+      // Fallback to localStorage
+      const entries = await PaymentDataManager.getIncomeEntries();
+      const newEntry: IncomeEntry = {
+        ...entry,
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+        createdAt: new Date().toISOString()
+      };
+      
+      entries.push(newEntry);
+      localStorage.setItem('payment_tracker_income', JSON.stringify(entries));
+      return newEntry;
+    }
   }
 
-  static addIncomeEntry(entry: Omit<IncomeEntry, 'id' | 'createdAt'>): IncomeEntry {
-    const entries = PaymentDataManager.getIncomeEntries();
-    const newEntry: IncomeEntry = {
-      ...entry,
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
-      createdAt: new Date().toISOString()
-    };
-    
-    entries.push(newEntry);
-    PaymentDataManager.saveIncomeEntries(entries);
-    return newEntry;
+  static async deleteIncomeEntry(id: string): Promise<void> {
+    try {
+      await paymentsApi.delete(id);
+    } catch (error) {
+      console.error('❌ Failed to delete payment via API, using localStorage:', error);
+      const entries = await PaymentDataManager.getIncomeEntries();
+      const filtered = entries.filter(entry => entry.id !== id);
+      localStorage.setItem('payment_tracker_income', JSON.stringify(filtered));
+    }
   }
 
-  static deleteIncomeEntry(id: string) {
-    const entries = PaymentDataManager.getIncomeEntries();
-    const filtered = entries.filter(entry => entry.id !== id);
-    PaymentDataManager.saveIncomeEntries(filtered);
+  // Expense entries management - API + localStorage hybrid
+  static async getExpenseEntries(): Promise<ExpenseEntry[]> {
+    try {
+      const apiExpenses = await expensesApi.getAll();
+      return apiExpenses.map((expense: any) => ({
+        id: expense._id,
+        item: expense.item,
+        amount: expense.amount,
+        date: expense.date,
+        remarks: expense.remarks,
+        isExtra: expense.isExtra,
+        createdAt: expense.createdAt || expense.date
+      }));
+    } catch (error) {
+      console.error('❌ Failed to fetch expenses from API, using localStorage:', error);
+      const stored = localStorage.getItem('payment_tracker_expenses');
+      return stored ? JSON.parse(stored) : [];
+    }
   }
 
-  // Expense entries management
-  static getExpenseEntries(): ExpenseEntry[] {
-    const stored = localStorage.getItem('payment_tracker_expenses');
-    return stored ? JSON.parse(stored) : [];
+  static async addExpenseEntry(entry: Omit<ExpenseEntry, 'id' | 'createdAt'>): Promise<ExpenseEntry> {
+    try {
+      const expenseData = {
+        item: entry.item,
+        amount: entry.amount,
+        date: entry.date,
+        remarks: entry.remarks,
+        isExtra: entry.isExtra
+      };
+
+      const createdExpense = await expensesApi.create(expenseData);
+      
+      return {
+        id: createdExpense._id,
+        item: createdExpense.item,
+        amount: createdExpense.amount,
+        date: createdExpense.date,
+        remarks: createdExpense.remarks,
+        isExtra: createdExpense.isExtra,
+        createdAt: createdExpense.createdAt || createdExpense.date
+      };
+    } catch (error) {
+      console.error('❌ Failed to create expense via API, using localStorage:', error);
+      // Fallback to localStorage
+      const entries = await PaymentDataManager.getExpenseEntries();
+      const newEntry: ExpenseEntry = {
+        ...entry,
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+        createdAt: new Date().toISOString()
+      };
+      
+      entries.push(newEntry);
+      localStorage.setItem('payment_tracker_expenses', JSON.stringify(entries));
+      return newEntry;
+    }
   }
 
-  static saveExpenseEntries(entries: ExpenseEntry[]) {
-    localStorage.setItem('payment_tracker_expenses', JSON.stringify(entries));
+  static async deleteExpenseEntry(id: string): Promise<void> {
+    try {
+      await expensesApi.delete(id);
+    } catch (error) {
+      console.error('❌ Failed to delete expense via API, using localStorage:', error);
+      const entries = await PaymentDataManager.getExpenseEntries();
+      const filtered = entries.filter(entry => entry.id !== id);
+      localStorage.setItem('payment_tracker_expenses', JSON.stringify(filtered));
+    }
   }
 
-  static addExpenseEntry(entry: Omit<ExpenseEntry, 'id' | 'createdAt'>): ExpenseEntry {
-    const entries = PaymentDataManager.getExpenseEntries();
-    const newEntry: ExpenseEntry = {
-      ...entry,
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
-      createdAt: new Date().toISOString()
-    };
-    
-    entries.push(newEntry);
-    PaymentDataManager.saveExpenseEntries(entries);
-    return newEntry;
-  }
-
-  static deleteExpenseEntry(id: string) {
-    const entries = PaymentDataManager.getExpenseEntries();
-    const filtered = entries.filter(entry => entry.id !== id);
-    PaymentDataManager.saveExpenseEntries(filtered);
-  }
-
-  static toggleExpenseExtra(id: string) {
-    const entries = PaymentDataManager.getExpenseEntries();
-    const entry = entries.find(e => e.id === id);
-    if (entry) {
-      entry.isExtra = !entry.isExtra;
-      PaymentDataManager.saveExpenseEntries(entries);
+  static async toggleExpenseExtra(id: string): Promise<void> {
+    try {
+      const entries = await PaymentDataManager.getExpenseEntries();
+      const entry = entries.find(e => e.id === id);
+      if (entry) {
+        await expensesApi.update(id, { isExtra: !entry.isExtra });
+      }
+    } catch (error) {
+      console.error('❌ Failed to update expense via API, using localStorage:', error);
+      const entries = await PaymentDataManager.getExpenseEntries();
+      const entry = entries.find(e => e.id === id);
+      if (entry) {
+        entry.isExtra = !entry.isExtra;
+        localStorage.setItem('payment_tracker_expenses', JSON.stringify(entries));
+      }
     }
   }
 
@@ -229,7 +465,7 @@ export default function PaymentTracker() {
   const [orderForm, setOrderForm] = useState({
     customerName: '',
     deliveryDate: new Date().toISOString().split('T')[0],
-    priceType: 'retail' as 'retail' | 'wholesale',
+    productVariant: 'sada' as 'sada' | 'peri-peri' | 'cheese',
     packages: {} as { [key: number]: number }
   });
 
@@ -276,21 +512,41 @@ export default function PaymentTracker() {
   const [priceTypeFilter, setPriceTypeFilter] = useState<'all' | 'retail' | 'wholesale'>('all');
   const [expenseTypeFilter, setExpenseTypeFilter] = useState<'all' | 'business' | 'extra'>('all');
 
-  // *** FIXED: Load data with proper error handling ***
+  // *** UPDATED: Load data with async API calls ***
   useEffect(() => {
-    try {
-      setOrders(PaymentDataManager.getOrders());
-      setIncomeEntries(PaymentDataManager.getIncomeEntries());
-      setExpenseEntries(PaymentDataManager.getExpenseEntries());
-      setCurrentPrices(PaymentDataManager.getSellingPrices());
-    } catch (error) {
-      console.error('Error loading data:', error);
-      // Set default values if error occurs
-      setOrders([]);
-      setIncomeEntries([]);
-      setExpenseEntries([]);
-      setCurrentPrices({ retail: {}, wholesale: {} });
-    }
+    const loadData = async () => {
+      try {
+        console.log('🔄 Loading data from API...');
+        const [ordersData, incomeData, expenseData] = await Promise.all([
+          PaymentDataManager.getOrders(),
+          PaymentDataManager.getIncomeEntries(),
+          PaymentDataManager.getExpenseEntries()
+        ]);
+        
+        setOrders(ordersData);
+        setIncomeEntries(incomeData);
+        setExpenseEntries(expenseData);
+        setCurrentPrices(PaymentDataManager.getSellingPrices());
+        
+        console.log('✅ Data loaded successfully');
+        console.log('📊 Orders:', ordersData.length);
+        console.log('💰 Income entries:', incomeData.length);
+        console.log('💸 Expense entries:', expenseData.length);
+      } catch (error) {
+        console.error('❌ Error loading data:', error);
+        // Set default values if error occurs
+        setOrders([]);
+        setIncomeEntries([]);
+        setExpenseEntries([]);
+        setCurrentPrices({
+          'sada': {},
+          'peri-peri': {},
+          'cheese': {}
+        });
+      }
+    };
+    
+    loadData();
   }, [refreshKey]);
 
   // Handle pricing updates
@@ -356,8 +612,8 @@ export default function PaymentTracker() {
     .reduce((sum, entry) => sum + entry.amount, 0);
   const profit = totalIncome - totalExpense;
 
-  // *** FIXED: Calculate order summary with proper error handling ***
-  const calculateOrderSummary = (packages: { [key: number]: number }, priceType: 'retail' | 'wholesale') => {
+  // *** UPDATED: Calculate order summary with variant pricing ***
+  const calculateOrderSummary = (packages: { [key: number]: number }, productVariant: 'sada' | 'peri-peri' | 'cheese') => {
     let totalWeight = 0;
     let totalPackets = 0;
     let totalAmount = 0;
@@ -367,15 +623,15 @@ export default function PaymentTracker() {
       let selectedPrices;
       
       if (allPrices && typeof allPrices === 'object') {
-        selectedPrices = allPrices[priceType] || allPrices.retail || {};
+        selectedPrices = allPrices[productVariant] || allPrices['sada'] || {};
       } else {
-        selectedPrices = {
-          50: priceType === 'wholesale' ? 12 : 15,
-          100: priceType === 'wholesale' ? 20 : 25,
-          250: priceType === 'wholesale' ? 56 : 70,
-          500: priceType === 'wholesale' ? 80 : 100,
-          1000: priceType === 'wholesale' ? 200 : 250
+        // Default prices based on variant
+        const defaultPrices = {
+          'sada': { 50: 15, 100: 25, 250: 50, 500: 100, 1000: 200 },
+          'peri-peri': { 50: 20, 100: 30, 250: 75, 500: 150, 1000: 275 },
+          'cheese': { 50: 20, 100: 30, 250: 75, 500: 150, 1000: 275 }
         };
+        selectedPrices = defaultPrices[productVariant];
       }
 
       CONFIG.PACKET_SIZES.forEach(size => {
@@ -404,7 +660,7 @@ export default function PaymentTracker() {
   };
 
   // Handle order form submission
-  const handleOrderSubmit = (e: React.FormEvent) => {
+  const handleOrderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!orderForm.customerName.trim()) {
@@ -412,7 +668,7 @@ export default function PaymentTracker() {
       return;
     }
 
-    const summary = calculateOrderSummary(orderForm.packages, orderForm.priceType);
+    const summary = calculateOrderSummary(orderForm.packages, orderForm.productVariant);
     
     if (summary.totalPackets === 0) {
       alert('कृपया कम से कम एक package का order दें!');
@@ -453,30 +709,36 @@ export default function PaymentTracker() {
         };
       });
 
-    PaymentDataManager.addOrder({
-      customerName: orderForm.customerName.trim(),
-      deliveryDate: orderForm.deliveryDate,
-      packages: packageItems,
-      totalWeight: summary.totalWeight,
-      totalAmount: summary.totalAmount,
-      status: 'pending',
-      priceType: orderForm.priceType
-    });
+    try {
+      await PaymentDataManager.addOrder({
+        customerName: orderForm.customerName.trim(),
+        deliveryDate: orderForm.deliveryDate,
+        packages: packageItems,
+        totalWeight: summary.totalWeight,
+        totalAmount: summary.totalAmount,
+        status: 'pending',
+        productVariant: orderForm.productVariant
+      });
 
-    // Reset form
-    setOrderForm({
-      customerName: '',
-      deliveryDate: new Date().toISOString().split('T')[0],
-      priceType: 'retail',
-      packages: {}
-    });
-    
-    setShowOrderForm(false);
-    setRefreshKey(prev => prev + 1);
+      // Reset form
+      setOrderForm({
+        customerName: '',
+        deliveryDate: new Date().toISOString().split('T')[0],
+        productVariant: 'sada',
+        packages: {}
+      });
+      
+      setShowOrderForm(false);
+      setRefreshKey(prev => prev + 1);
+      alert('✅ Order created successfully!');
+    } catch (error) {
+      console.error('❌ Error creating order:', error);
+      alert('❌ Order create करने में error आया!');
+    }
   };
 
-  // *** FIXED: Handle income form submission with proper validation ***
-  const handleIncomeSubmit = (e: React.FormEvent) => {
+  // *** UPDATED: Handle income form submission with async API ***
+  const handleIncomeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!incomeForm.customerName.trim() || !incomeForm.amount) {
@@ -491,7 +753,7 @@ export default function PaymentTracker() {
     }
 
     try {
-      PaymentDataManager.addIncomeEntry({
+      await PaymentDataManager.addIncomeEntry({
         customerName: incomeForm.customerName.trim(),
         amount: amountValue,
         date: incomeForm.date,
@@ -515,13 +777,13 @@ export default function PaymentTracker() {
       
       alert('✅ Income entry जोड़ा गया!');
     } catch (error) {
-      console.error('Error adding income:', error);
+      console.error('❌ Error adding income:', error);
       alert('❌ Income add करने में error आया!');
     }
   };
 
   // Handle expense form submission
-  const handleExpenseSubmit = (e: React.FormEvent) => {
+  const handleExpenseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!expenseForm.item.trim() || !expenseForm.amount) {
@@ -536,7 +798,7 @@ export default function PaymentTracker() {
     }
 
     try {
-      PaymentDataManager.addExpenseEntry({
+      await PaymentDataManager.addExpenseEntry({
         item: expenseForm.item.trim(),
         amount: amountValue,
         date: expenseForm.date,
@@ -558,7 +820,7 @@ export default function PaymentTracker() {
       
       alert('✅ Expense entry जोड़ा गया!');
     } catch (error) {
-      console.error('Error adding expense:', error);
+      console.error('❌ Error adding expense:', error);
       alert('❌ Expense add करने में error आया!');
     }
   };
@@ -754,32 +1016,41 @@ export default function PaymentTracker() {
                     </div>
                     
                     <div>
-                      <Label className="text-sm font-medium">Pricing Type *</Label>
+                      <Label className="text-sm font-medium">Product Variant *</Label>
                       <div className="flex items-center space-x-2 mt-2">
                         <Button
                           type="button"
-                          variant={orderForm.priceType === 'retail' ? 'default' : 'outline'}
+                          variant={orderForm.productVariant === 'sada' ? 'default' : 'outline'}
                           size="sm"
-                          onClick={() => setOrderForm(prev => ({...prev, priceType: 'retail'}))}
-                          className={orderForm.priceType === 'retail' ? 'bg-green-600 hover:bg-green-700' : ''}
+                          onClick={() => setOrderForm(prev => ({...prev, productVariant: 'sada'}))}
+                          className={orderForm.productVariant === 'sada' ? 'bg-orange-600 hover:bg-orange-700' : ''}
                         >
-                          🏪 Retail
+                          🥨 Sada
                         </Button>
                         <Button
                           type="button"
-                          variant={orderForm.priceType === 'wholesale' ? 'default' : 'outline'}
+                          variant={orderForm.productVariant === 'peri-peri' ? 'default' : 'outline'}
                           size="sm"
-                          onClick={() => setOrderForm(prev => ({...prev, priceType: 'wholesale'}))}
-                          className={orderForm.priceType === 'wholesale' ? 'bg-blue-600 hover:bg-blue-700' : ''}
+                          onClick={() => setOrderForm(prev => ({...prev, productVariant: 'peri-peri'}))}
+                          className={orderForm.productVariant === 'peri-peri' ? 'bg-red-600 hover:bg-red-700' : ''}
                         >
-                          🏭 Wholesale
+                          🌶️ Peri Peri
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={orderForm.productVariant === 'cheese' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setOrderForm(prev => ({...prev, productVariant: 'cheese'}))}
+                          className={orderForm.productVariant === 'cheese' ? 'bg-yellow-600 hover:bg-yellow-700' : ''}
+                        >
+                          🧀 Cheese
                         </Button>
                       </div>
                     </div>
 
                     <div>
                       <Label className="text-base font-semibold">
-                        Select Packages ({orderForm.priceType === 'wholesale' ? '🏭 Wholesale' : '🏪 Retail'} Rates)
+                        Select Packages ({CONFIG.PRODUCT_VARIANTS[orderForm.productVariant]} Rates)
                       </Label>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mt-3">
                         {CONFIG.PACKET_SIZES.map(size => {
@@ -787,12 +1058,18 @@ export default function PaymentTracker() {
                           let currentRate = 0;
                           
                           if (allPrices && typeof allPrices === 'object') {
-                            const selectedPrices = allPrices[orderForm.priceType] || allPrices.retail || {};
+                            const selectedPrices = allPrices[orderForm.productVariant] || allPrices['sada'] || {};
                             currentRate = selectedPrices[size] || 0;
                           }
                           
                           if (currentRate === 0) {
-                            currentRate = orderForm.priceType === 'wholesale' ? (size * 0.2) : (size * 0.25);
+                            // Default fallback rates based on variant
+                            const defaultRates = {
+                              'sada': { 50: 15, 100: 25, 250: 50, 500: 100, 1000: 200 },
+                              'peri-peri': { 50: 20, 100: 30, 250: 75, 500: 150, 1000: 275 },
+                              'cheese': { 50: 20, 100: 30, 250: 75, 500: 150, 1000: 275 }
+                            };
+                            currentRate = defaultRates[orderForm.productVariant][size] || 0;
                           }
                           
                           return (
@@ -921,9 +1198,17 @@ export default function PaymentTracker() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => {
-                              PaymentDataManager.deleteOrder(order.id);
-                              setRefreshKey(prev => prev + 1);
+                            onClick={async () => {
+                              if (confirm('क्या आप इस order को delete करना चाहते हैं?')) {
+                                try {
+                                  await PaymentDataManager.deleteOrder(order.id);
+                                  setRefreshKey(prev => prev + 1);
+                                  alert('✅ Order deleted successfully!');
+                                } catch (error) {
+                                  console.error('❌ Error deleting order:', error);
+                                  alert('❌ Order delete करने में error आया!');
+                                }
+                              }
                             }}
                             className="text-red-600 hover:text-red-700"
                           >
