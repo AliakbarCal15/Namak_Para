@@ -270,18 +270,18 @@ class PaymentDataManager {
       }
     };
     
-    const stored = localStorage.getItem('payment_tracker_selling_prices');
+    const stored = localStorage.getItem('payment_tracker_variant_prices');
     return stored ? JSON.parse(stored) : defaultPrices;
   }
 
-  static saveSellingPrices(prices: { retail: { [key: number]: number }, wholesale: { [key: number]: number } }) {
-    localStorage.setItem('payment_tracker_selling_prices', JSON.stringify(prices));
+  static saveSellingPrices(prices: { [variant: string]: { [size: number]: number } }) {
+    localStorage.setItem('payment_tracker_variant_prices', JSON.stringify(prices));
   }
 
-  static updateSellingPrice(type: 'retail' | 'wholesale', size: number, newPrice: number) {
+  static updateSellingPrice(variant: 'sada' | 'peri-peri' | 'cheese', size: number, newPrice: number) {
     const prices = PaymentDataManager.getSellingPrices();
-    if (!prices[type]) prices[type] = {};
-    prices[type][size] = newPrice;
+    if (!prices[variant]) prices[variant] = {};
+    prices[variant][size] = newPrice;
     PaymentDataManager.saveSellingPrices(prices);
   }
 
@@ -497,10 +497,7 @@ export default function PaymentTracker() {
   
   // Pricing management states
   const [showPricingModal, setShowPricingModal] = useState(false);
-  const [currentPrices, setCurrentPrices] = useState<{ retail: { [key: number]: number }, wholesale: { [key: number]: number } }>({
-    retail: {},
-    wholesale: {}
-  });
+  const [currentPrices, setCurrentPrices] = useState<{ [variant: string]: { [size: number]: number } }>({});
 
   // Search and filter states
   const [searchFilters, setSearchFilters] = useState({
@@ -532,17 +529,14 @@ export default function PaymentTracker() {
         console.log('📊 Orders:', ordersData.length);
         console.log('💰 Income entries:', incomeData.length);
         console.log('💸 Expense entries:', expenseData.length);
+        console.log('💰 Current Prices:', PaymentDataManager.getSellingPrices());
       } catch (error) {
         console.error('❌ Error loading data:', error);
         // Set default values if error occurs
         setOrders([]);
         setIncomeEntries([]);
         setExpenseEntries([]);
-        setCurrentPrices({
-          'sada': {},
-          'peri-peri': {},
-          'cheese': {}
-        });
+        setCurrentPrices(PaymentDataManager.getSellingPrices());
       }
     };
     
@@ -550,19 +544,20 @@ export default function PaymentTracker() {
   }, [refreshKey]);
 
   // Handle pricing updates
-  const handlePriceUpdate = (type: 'retail' | 'wholesale', size: number, newPrice: number) => {
+  const handlePriceUpdate = (variant: 'sada' | 'peri-peri' | 'cheese', size: number, newPrice: number) => {
     if (newPrice < 0) return;
     
     const updatedPrices = {
       ...currentPrices,
-      [type]: {
-        ...currentPrices[type],
+      [variant]: {
+        ...currentPrices[variant],
         [size]: newPrice
       }
     };
     
     setCurrentPrices(updatedPrices);
     PaymentDataManager.saveSellingPrices(updatedPrices);
+    console.log(`✅ Price updated: ${variant} ${size}g = ₹${newPrice}`);
   };
 
   // Filter functions
@@ -619,19 +614,13 @@ export default function PaymentTracker() {
     let totalAmount = 0;
     
     try {
-      const allPrices = PaymentDataManager.getSellingPrices();
+      const allPrices = currentPrices;
       let selectedPrices;
       
       if (allPrices && typeof allPrices === 'object') {
-        selectedPrices = allPrices[productVariant] || allPrices['sada'] || {};
+        selectedPrices = allPrices[productVariant] || {};
       } else {
-        // Default prices based on variant
-        const defaultPrices = {
-          'sada': { 50: 15, 100: 25, 250: 50, 500: 100, 1000: 200 },
-          'peri-peri': { 50: 20, 100: 30, 250: 75, 500: 150, 1000: 275 },
-          'cheese': { 50: 20, 100: 30, 250: 75, 500: 150, 1000: 275 }
-        };
-        selectedPrices = defaultPrices[productVariant];
+        selectedPrices = {};
       }
 
       CONFIG.PACKET_SIZES.forEach(size => {
@@ -642,7 +631,13 @@ export default function PaymentTracker() {
         if (selectedPrices && selectedPrices[size]) {
           pricePerPacket = selectedPrices[size];
         } else {
-          pricePerPacket = priceType === 'wholesale' ? (size * 0.2) : (size * 0.25);
+          // Fallback to default prices if not set
+          const defaultPrices = {
+            'sada': { 50: 15, 100: 25, 250: 50, 500: 100, 1000: 200 },
+            'peri-peri': { 50: 20, 100: 30, 250: 75, 500: 150, 1000: 275 },
+            'cheese': { 50: 20, 100: 30, 250: 75, 500: 150, 1000: 275 }
+          };
+          pricePerPacket = defaultPrices[productVariant]?.[size] || 0;
         }
         
         const amount = pricePerPacket * qty;
@@ -675,31 +670,25 @@ export default function PaymentTracker() {
       return;
     }
 
-    const allPrices = PaymentDataManager.getSellingPrices();
     let selectedPrices;
     
-    if (allPrices && typeof allPrices === 'object') {
-      selectedPrices = allPrices[orderForm.priceType] || allPrices.retail || {};
+    if (currentPrices && currentPrices[orderForm.productVariant]) {
+      selectedPrices = currentPrices[orderForm.productVariant];
     } else {
-      selectedPrices = {
-        50: orderForm.priceType === 'wholesale' ? 12 : 15,
-        100: orderForm.priceType === 'wholesale' ? 20 : 25,
-        250: orderForm.priceType === 'wholesale' ? 56 : 70,
-        500: orderForm.priceType === 'wholesale' ? 80 : 100,
-        1000: orderForm.priceType === 'wholesale' ? 200 : 250
+      // Fallback to default prices
+      const defaultPrices = {
+        'sada': { 50: 15, 100: 25, 250: 50, 500: 100, 1000: 200 },
+        'peri-peri': { 50: 20, 100: 30, 250: 75, 500: 150, 1000: 275 },
+        'cheese': { 50: 20, 100: 30, 250: 75, 500: 150, 1000: 275 }
       };
+      selectedPrices = defaultPrices[orderForm.productVariant] || {};
     }
     
     const packageItems: PackageItem[] = CONFIG.PACKET_SIZES
       .filter(size => orderForm.packages[size] > 0)
       .map(size => {
         const qty = orderForm.packages[size];
-        let pricePerPacket = 0;
-        if (selectedPrices && selectedPrices[size]) {
-          pricePerPacket = selectedPrices[size];
-        } else {
-          pricePerPacket = orderForm.priceType === 'wholesale' ? (size * 0.2) : (size * 0.25);
-        }
+        let pricePerPacket = selectedPrices[size] || 0;
         
         return {
           size,
@@ -1054,12 +1043,10 @@ export default function PaymentTracker() {
                       </Label>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mt-3">
                         {CONFIG.PACKET_SIZES.map(size => {
-                          const allPrices = PaymentDataManager.getSellingPrices();
                           let currentRate = 0;
                           
-                          if (allPrices && typeof allPrices === 'object') {
-                            const selectedPrices = allPrices[orderForm.productVariant] || allPrices['sada'] || {};
-                            currentRate = selectedPrices[size] || 0;
+                          if (currentPrices && currentPrices[orderForm.productVariant]) {
+                            currentRate = currentPrices[orderForm.productVariant][size] || 0;
                           }
                           
                           if (currentRate === 0) {
@@ -1073,7 +1060,7 @@ export default function PaymentTracker() {
                           }
                           
                           return (
-                            <Card key={size} className={`p-3 ${orderForm.priceType === 'wholesale' ? 'border-blue-200 bg-blue-50' : 'border-green-200 bg-green-50'}`}>
+                            <Card key={size} className="p-3 border-gray-200 bg-gray-50">
                               <div className="text-center">
                                 <h4 className="font-semibold text-gray-800 mb-2">{size}g Packets</h4>
                                 <Input
@@ -1090,7 +1077,7 @@ export default function PaymentTracker() {
                                   placeholder="Qty"
                                   className="text-center mb-2 h-8"
                                 />
-                                <div className={`text-xs ${orderForm.priceType === 'wholesale' ? 'text-blue-700' : 'text-green-700'} font-medium`}>
+                                <div className="text-xs text-gray-700 font-medium">
                                   Rate: ₹{currentRate}/packet
                                 </div>
                                 {orderForm.packages[size] > 0 && (
@@ -1679,11 +1666,11 @@ export default function PaymentTracker() {
         {/* Pricing Management Modal */}
         {showPricingModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <Card className="w-full max-w-6xl max-h-[90vh] overflow-y-auto">
               <CardHeader>
                 <div className="flex justify-between items-center">
                   <CardTitle className="text-xl font-bold text-gray-800">
-                    ⚙️ Edit Product Pricing
+                    ⚙️ Edit Product Pricing - All Variants
                   </CardTitle>
                   <Button 
                     variant="ghost" 
@@ -1693,34 +1680,34 @@ export default function PaymentTracker() {
                     <X className="w-4 h-4" />
                   </Button>
                 </div>
-                <p className="text-gray-600">Set prices for different packet sizes. Changes will apply to new orders.</p>
+                <p className="text-gray-600">Set prices for different variants and packet sizes. Changes are saved automatically.</p>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-8">
                 
-                {/* Retail Pricing Section */}
+                {/* Sada Namak Para Pricing */}
                 <div>
-                  <h3 className="text-lg font-semibold text-green-700 mb-4">🏪 Retail Pricing</h3>
+                  <h3 className="text-lg font-semibold text-orange-700 mb-4">🥨 Sada Namak Para Pricing</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                     {CONFIG.PACKET_SIZES.map(size => (
-                      <Card key={`retail-${size}`} className="border-green-200 bg-green-50">
+                      <Card key={`sada-${size}`} className="border-orange-200 bg-orange-50">
                         <CardContent className="p-4 text-center">
                           <h4 className="font-semibold text-gray-800 mb-3">{size}g Packet</h4>
                           <div className="space-y-2">
-                            <Label htmlFor={`retail-${size}`} className="text-xs text-gray-600">
+                            <Label htmlFor={`sada-${size}`} className="text-xs text-gray-600">
                               Price per packet (₹)
                             </Label>
                             <Input
-                              id={`retail-${size}`}
+                              id={`sada-${size}`}
                               type="number"
                               min="0"
                               step="0.5"
-                              value={currentPrices.retail?.[size] || ''}
-                              onChange={(e) => handlePriceUpdate('retail', size, parseFloat(e.target.value) || 0)}
+                              value={currentPrices.sada?.[size] || ''}
+                              onChange={(e) => handlePriceUpdate('sada', size, parseFloat(e.target.value) || 0)}
                               className="text-center font-semibold"
                               placeholder="0"
                             />
-                            <div className="text-xs text-green-700">
-                              Rate per gram: ₹{((currentPrices.retail?.[size] || 0) / size).toFixed(2)}
+                            <div className="text-xs text-orange-700">
+                              Rate per gram: ₹{((currentPrices.sada?.[size] || 0) / size).toFixed(2)}
                             </div>
                           </div>
                         </CardContent>
@@ -1729,30 +1716,62 @@ export default function PaymentTracker() {
                   </div>
                 </div>
 
-                {/* Wholesale Pricing Section */}
+                {/* Peri Peri Namak Para Pricing */}
                 <div>
-                  <h3 className="text-lg font-semibold text-blue-700 mb-4">🏭 Wholesale Pricing</h3>
+                  <h3 className="text-lg font-semibold text-red-700 mb-4">🌶️ Peri Peri Namak Para Pricing</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                     {CONFIG.PACKET_SIZES.map(size => (
-                      <Card key={`wholesale-${size}`} className="border-blue-200 bg-blue-50">
+                      <Card key={`peri-peri-${size}`} className="border-red-200 bg-red-50">
                         <CardContent className="p-4 text-center">
                           <h4 className="font-semibold text-gray-800 mb-3">{size}g Packet</h4>
                           <div className="space-y-2">
-                            <Label htmlFor={`wholesale-${size}`} className="text-xs text-gray-600">
+                            <Label htmlFor={`peri-peri-${size}`} className="text-xs text-gray-600">
                               Price per packet (₹)
                             </Label>
                             <Input
-                              id={`wholesale-${size}`}
+                              id={`peri-peri-${size}`}
                               type="number"
                               min="0"
                               step="0.5"
-                              value={currentPrices.wholesale?.[size] || ''}
-                              onChange={(e) => handlePriceUpdate('wholesale', size, parseFloat(e.target.value) || 0)}
+                              value={currentPrices['peri-peri']?.[size] || ''}
+                              onChange={(e) => handlePriceUpdate('peri-peri', size, parseFloat(e.target.value) || 0)}
                               className="text-center font-semibold"
                               placeholder="0"
                             />
-                            <div className="text-xs text-blue-700">
-                              Rate per gram: ₹{((currentPrices.wholesale?.[size] || 0) / size).toFixed(2)}
+                            <div className="text-xs text-red-700">
+                              Rate per gram: ₹{((currentPrices['peri-peri']?.[size] || 0) / size).toFixed(2)}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Cheese Namak Para Pricing */}
+                <div>
+                  <h3 className="text-lg font-semibold text-yellow-700 mb-4">🧀 Cheese Namak Para Pricing</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                    {CONFIG.PACKET_SIZES.map(size => (
+                      <Card key={`cheese-${size}`} className="border-yellow-200 bg-yellow-50">
+                        <CardContent className="p-4 text-center">
+                          <h4 className="font-semibold text-gray-800 mb-3">{size}g Packet</h4>
+                          <div className="space-y-2">
+                            <Label htmlFor={`cheese-${size}`} className="text-xs text-gray-600">
+                              Price per packet (₹)
+                            </Label>
+                            <Input
+                              id={`cheese-${size}`}
+                              type="number"
+                              min="0"
+                              step="0.5"
+                              value={currentPrices.cheese?.[size] || ''}
+                              onChange={(e) => handlePriceUpdate('cheese', size, parseFloat(e.target.value) || 0)}
+                              className="text-center font-semibold"
+                              placeholder="0"
+                            />
+                            <div className="text-xs text-yellow-700">
+                              Rate per gram: ₹{((currentPrices.cheese?.[size] || 0) / size).toFixed(2)}
                             </div>
                           </div>
                         </CardContent>
@@ -1763,41 +1782,44 @@ export default function PaymentTracker() {
 
                 {/* Quick Actions */}
                 <div className="border-t pt-6">
-                  <h4 className="font-semibold text-gray-800 mb-4">Quick Actions</h4>
-                  <div className="flex flex-wrap gap-2">
+                  <h4 className="font-semibold text-gray-800 mb-4">Quick Pricing Actions</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <Button
                       variant="outline"
-                      size="sm"
                       onClick={() => {
                         const updatedPrices = { ...currentPrices };
-                        CONFIG.PACKET_SIZES.forEach(size => {
-                          if (updatedPrices.retail[size] > 0) {
-                            updatedPrices.wholesale[size] = Math.round(updatedPrices.retail[size] * 0.8);
-                          }
-                        });
+                        // Set default prices based on image
+                        updatedPrices.sada = { 50: 15, 100: 25, 250: 50, 500: 100, 1000: 200 };
                         setCurrentPrices(updatedPrices);
                         PaymentDataManager.saveSellingPrices(updatedPrices);
                       }}
-                      className="border-blue-300 text-blue-700"
+                      className="border-orange-300 text-orange-700"
                     >
-                      Set Wholesale = 80% of Retail
+                      Reset Sada Prices (Menu Default)
                     </Button>
                     <Button
                       variant="outline"
-                      size="sm"
                       onClick={() => {
                         const updatedPrices = { ...currentPrices };
-                        CONFIG.PACKET_SIZES.forEach(size => {
-                          if (updatedPrices.retail[size] > 0) {
-                            updatedPrices.wholesale[size] = Math.round(updatedPrices.retail[size] * 0.75);
-                          }
-                        });
+                        updatedPrices['peri-peri'] = { 50: 20, 100: 30, 250: 75, 500: 150, 1000: 275 };
                         setCurrentPrices(updatedPrices);
                         PaymentDataManager.saveSellingPrices(updatedPrices);
                       }}
-                      className="border-blue-300 text-blue-700"
+                      className="border-red-300 text-red-700"
                     >
-                      Set Wholesale = 75% of Retail
+                      Reset Peri Peri Prices (Menu Default)
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        const updatedPrices = { ...currentPrices };
+                        updatedPrices.cheese = { 50: 20, 100: 30, 250: 75, 500: 150, 1000: 275 };
+                        setCurrentPrices(updatedPrices);
+                        PaymentDataManager.saveSellingPrices(updatedPrices);
+                      }}
+                      className="border-yellow-300 text-yellow-700"
+                    >
+                      Reset Cheese Prices (Menu Default)
                     </Button>
                   </div>
                 </div>
@@ -1813,10 +1835,11 @@ export default function PaymentTracker() {
                     onClick={() => {
                       setShowPricingModal(false);
                       setRefreshKey(prev => prev + 1);
+                      alert('✅ All pricing changes have been saved!');
                     }}
                     className="bg-green-600 hover:bg-green-700"
                   >
-                    Save & Apply
+                    Save & Apply All Changes
                   </Button>
                 </div>
               </CardContent>
