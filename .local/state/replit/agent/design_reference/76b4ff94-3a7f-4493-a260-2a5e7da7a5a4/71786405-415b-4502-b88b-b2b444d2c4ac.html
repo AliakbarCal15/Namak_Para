@@ -1,0 +1,1736 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧂 CrunchTrack: Namak Para Business Suite</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#FF6B35',
+                        secondary: '#8B4513',
+                        accent: '#FFB366',
+                        success: '#10B981',
+                        warning: '#F59E0B',
+                        error: '#EF4444'
+                    },
+                    fontFamily: {
+                        'sans': ['Inter', 'system-ui', 'sans-serif']
+                    }
+                }
+            }
+        };
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <style>
+        /* Custom styles for business dashboard */
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #FF6B35 0%, #FFB366 100%);
+        }
+        
+        .business-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border: 1px solid #f3f4f6;
+        }
+        
+        /* Print styles for reports */
+        @media print {
+            .no-print { display: none !important; }
+            .print-break { page-break-after: always; }
+        }
+        
+        /* Mobile responsiveness */
+        @media (max-width: 768px) {
+            .mobile-stack { flex-direction: column !important; }
+            .mobile-full { width: 100% !important; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans">
+    <!-- @COMPONENT: App [Main application container] -->
+    <div id="app" class="min-h-screen">
+        
+        <!-- Header Section -->
+        <!-- @COMPONENT: Header [App navigation and branding] -->
+        <header class="gradient-bg text-white shadow-lg">
+            <div class="container mx-auto px-4 py-4">
+                <div class="flex items-center justify-between flex-wrap">
+                    <div class="flex items-center space-x-3">
+                        <i class="fas fa-cookie-bite text-2xl"></i>
+                        <div>
+                            <h1 class="text-xl md:text-2xl font-bold">🧂 CrunchTrack</h1>
+                            <p class="text-sm opacity-90">From Flour to Fortune — Track It All!</p>
+                        </div>
+                    </div>
+                    <!-- Date and Time Display -->
+                    <div class="text-right mt-2 md:mt-0">
+                        <div id="currentDateTime" class="text-sm font-medium"></div>
+                        <div class="text-xs opacity-80">Business Suite</div>
+                    </div>
+                </div>
+            </div>
+        </header>
+        <!-- @END_COMPONENT: Header -->
+
+        <!-- Navigation Tabs -->
+        <!-- @COMPONENT: Navigation [Module switching tabs] -->
+        <nav class="bg-white border-b border-gray-200 sticky top-0 z-10 no-print">
+            <div class="container mx-auto px-4">
+                <div class="flex overflow-x-auto space-x-1 md:space-x-4 py-2" id="navigationTabs">
+                    <!-- Navigation buttons will be dynamically created -->
+                </div>
+            </div>
+        </nav>
+        <!-- @END_COMPONENT: Navigation -->
+
+        <!-- Main Content Area -->
+        <main class="container mx-auto px-4 py-6">
+            <div id="moduleContent">
+                <!-- Dynamic content based on selected module -->
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="bg-gray-800 text-white py-4 text-center text-sm no-print">
+            <p>&copy; 2024 CrunchTrack Business Suite | Made with ❤️ for Namak Para Business</p>
+        </footer>
+    </div>
+    <!-- @END_COMPONENT: App -->
+
+    <script>
+        /* ============================================
+         * 🧂 CRUNCHTRACK BUSINESS SUITE
+         * Complete Namak Para Business Management System
+         * ============================================ */
+
+        (function() {
+            'use strict';
+
+            // ==========================================
+            // 🏗️ GLOBAL CONFIGURATION & CONSTANTS
+            // ==========================================
+            
+            const CONFIG = {
+                // Business constants for calculations
+                YIELD_RATIO: 1.4, // 1kg maida produces 1.4kg namak para
+                GAS_COST_PER_MINUTE: 2, // ₹2 per minute of gas usage
+                DEFAULT_PACKET_SIZES: [50, 100, 250, 500], // Available packet sizes in grams
+                
+                // Storage keys for localStorage
+                STORAGE_KEYS: {
+                    orders: 'crunchtrack_orders',
+                    materials: 'crunchtrack_materials',
+                    payments: 'crunchtrack_payments',
+                    settings: 'crunchtrack_settings'
+                },
+                
+                // Module configuration
+                MODULES: [
+                    { id: 'dashboard', name: '🏠 Dashboard', icon: 'fas fa-home' },
+                    { id: 'orders', name: '📋 Orders', icon: 'fas fa-clipboard-list' },
+                    { id: 'materials', name: '⚙️ Materials', icon: 'fas fa-cogs' },
+                    { id: 'profit', name: '📈 Profit', icon: 'fas fa-chart-line' },
+                    { id: 'payments', name: '💰 Payments', icon: 'fas fa-money-bill-wave' },
+                    { id: 'forecast', name: '🔮 Forecast', icon: 'fas fa-crystal-ball' }
+                ]
+            };
+
+            // ==========================================
+            // 🗄️ DATA MANAGEMENT SYSTEM
+            // ==========================================
+            
+            class DataManager {
+                constructor() {
+                    this.initializeDefaultData();
+                }
+
+                // Initialize default data if not exists
+                initializeDefaultData() {
+                    if (!this.getOrders().length) {
+                        this.saveOrders([]);
+                    }
+                    if (!this.getMaterials().length) {
+                        this.saveMaterials([
+                            { id: 1, name: 'Maida', unit: 'kg', pricePerUnit: 50, stock: 0 },
+                            { id: 2, name: 'Oil', unit: 'litre', pricePerUnit: 120, stock: 0 },
+                            { id: 3, name: 'Salt', unit: 'kg', pricePerUnit: 20, stock: 0 },
+                            { id: 4, name: 'Ajwain', unit: 'kg', pricePerUnit: 300, stock: 0 },
+                            { id: 5, name: 'Gas', unit: 'cylinder', pricePerUnit: 800, stock: 0 }
+                        ]);
+                    }
+                }
+
+                // Orders management
+                getOrders() {
+                    return JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.orders) || '[]');
+                }
+
+                saveOrders(orders) {
+                    localStorage.setItem(CONFIG.STORAGE_KEYS.orders, JSON.stringify(orders));
+                }
+
+                addOrder(order) {
+                    const orders = this.getOrders();
+                    order.id = Date.now();
+                    order.createdAt = new Date().toISOString();
+                    orders.push(order);
+                    this.saveOrders(orders);
+                    return order;
+                }
+
+                // Materials management
+                getMaterials() {
+                    return JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.materials) || '[]');
+                }
+
+                saveMaterials(materials) {
+                    localStorage.setItem(CONFIG.STORAGE_KEYS.materials, JSON.stringify(materials));
+                }
+
+                // Payments management
+                getPayments() {
+                    return JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.payments) || '[]');
+                }
+
+                savePayments(payments) {
+                    localStorage.setItem(CONFIG.STORAGE_KEYS.payments, JSON.stringify(payments));
+                }
+
+                // Utility functions
+                generateId() {
+                    return Date.now() + Math.random().toString(36).substr(2, 9);
+                }
+
+                formatCurrency(amount) {
+                    return `₹${parseFloat(amount).toLocaleString('en-IN')}`;
+                }
+
+                formatDate(date) {
+                    return new Date(date).toLocaleDateString('en-IN');
+                }
+            }
+
+            // ==========================================
+            // 🧮 BUSINESS CALCULATION ENGINE
+            // ==========================================
+            
+            class BusinessCalculator {
+                constructor(dataManager) {
+                    this.dataManager = dataManager;
+                }
+
+                // Calculate total production cost for given quantities
+                calculateProductionCost(quantities) {
+                    const materials = this.dataManager.getMaterials();
+                    let totalCost = 0;
+
+                    // Material costs
+                    Object.entries(quantities).forEach(([materialName, quantity]) => {
+                        const material = materials.find(m => m.name.toLowerCase() === materialName.toLowerCase());
+                        if (material) {
+                            totalCost += quantity * material.pricePerUnit;
+                        }
+                    });
+
+                    // Gas cost (estimated 30 minutes per batch)
+                    totalCost += 30 * CONFIG.GAS_COST_PER_MINUTE;
+
+                    return totalCost;
+                }
+
+                // Calculate profit for an order
+                calculateOrderProfit(order) {
+                    const productionCost = this.calculateProductionCost(order.materialUsage || {});
+                    const revenue = order.totalAmount || 0;
+                    return revenue - productionCost;
+                }
+
+                // Calculate required materials for given production
+                calculateMaterialRequirements(totalWeight) {
+                    const weightInKg = totalWeight / 1000; // Convert grams to kg
+                    
+                    return {
+                        maida: weightInKg / CONFIG.YIELD_RATIO,
+                        oil: weightInKg * 0.1, // 10% oil ratio
+                        salt: weightInKg * 0.02, // 2% salt ratio
+                        ajwain: weightInKg * 0.01, // 1% ajwain ratio
+                        gasMinutes: Math.ceil(weightInKg / 5) * 30 // 30 minutes per 5kg batch
+                    };
+                }
+
+                // Get today's business summary
+                getTodaysSummary() {
+                    const today = new Date().toDateString();
+                    const orders = this.dataManager.getOrders().filter(order => 
+                        new Date(order.createdAt).toDateString() === today
+                    );
+
+                    const totalSales = orders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+                    const totalOrders = orders.length;
+                    const totalWeight = orders.reduce((sum, order) => sum + (order.totalWeight || 0), 0);
+
+                    return {
+                        totalSales,
+                        totalOrders,
+                        totalWeight,
+                        avgOrderValue: totalOrders > 0 ? totalSales / totalOrders : 0
+                    };
+                }
+            }
+
+            // ==========================================
+            // 🎨 UI COMPONENT RENDERER
+            // ==========================================
+            
+            class UIRenderer {
+                constructor(dataManager, calculator) {
+                    this.dataManager = dataManager;
+                    this.calculator = calculator;
+                    this.currentModule = 'dashboard';
+                }
+
+                // Initialize the application
+                init() {
+                    this.updateDateTime();
+                    this.renderNavigation();
+                    this.renderModule('dashboard');
+                    
+                    // Update time every minute
+                    setInterval(() => this.updateDateTime(), 60000);
+                }
+
+                // Update current date and time display
+                updateDateTime() {
+                    const now = new Date();
+                    const dateTime = now.toLocaleString('en-IN', {
+                        weekday: 'short',
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                    document.getElementById('currentDateTime').textContent = dateTime;
+                }
+
+                // Render navigation tabs
+                renderNavigation() {
+                    const navContainer = document.getElementById('navigationTabs');
+                    navContainer.innerHTML = CONFIG.MODULES.map(module => `
+                        <button 
+                            class="nav-tab px-4 py-2 rounded-lg font-medium transition-all duration-200 whitespace-nowrap ${
+                                this.currentModule === module.id 
+                                    ? 'bg-primary text-white shadow-md' 
+                                    : 'text-gray-600 hover:bg-gray-100'
+                            }"
+                            onclick="uiRenderer.switchModule('${module.id}')"
+                        >
+                            <i class="${module.icon} mr-2"></i>
+                            <span class="hidden sm:inline">${module.name}</span>
+                            <span class="sm:hidden">${module.name.split(' ')[0]}</span>
+                        </button>
+                    `).join('');
+                }
+
+                // Switch between modules
+                switchModule(moduleId) {
+                    this.currentModule = moduleId;
+                    this.renderNavigation();
+                    this.renderModule(moduleId);
+                }
+
+                // Render specific module content
+                renderModule(moduleId) {
+                    const contentContainer = document.getElementById('moduleContent');
+                    
+                    switch(moduleId) {
+                        case 'dashboard':
+                            contentContainer.innerHTML = this.renderDashboard();
+                            break;
+                        case 'orders':
+                            contentContainer.innerHTML = this.renderOrders();
+                            this.initializeOrdersModule();
+                            break;
+                        case 'materials':
+                            contentContainer.innerHTML = this.renderMaterials();
+                            this.initializeMaterialsModule();
+                            break;
+                        case 'profit':
+                            contentContainer.innerHTML = this.renderProfit();
+                            break;
+                        case 'payments':
+                            contentContainer.innerHTML = this.renderPayments();
+                            this.initializePaymentsModule();
+                            break;
+                        case 'forecast':
+                            contentContainer.innerHTML = this.renderForecast();
+                            break;
+                        default:
+                            contentContainer.innerHTML = this.renderDashboard();
+                    }
+                }
+
+                // ==========================================
+                // 📊 DASHBOARD MODULE
+                // ==========================================
+                
+                renderDashboard() {
+                    const summary = this.calculator.getTodaysSummary();
+                    const orders = this.dataManager.getOrders();
+                    const payments = this.dataManager.getPayments();
+                    
+                    // Calculate pending payments
+                    const totalDue = orders.reduce((sum, order) => {
+                        const paid = payments
+                            .filter(p => p.orderId === order.id)
+                            .reduce((paidSum, p) => paidSum + p.amount, 0);
+                        return sum + Math.max(0, (order.totalAmount || 0) - paid);
+                    }, 0);
+
+                    return `
+                        <div class="space-y-6">
+                            <div class="flex items-center justify-between">
+                                <h2 class="text-2xl font-bold text-gray-800">📊 Business Dashboard</h2>
+                                <button onclick="window.print()" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors no-print">
+                                    <i class="fas fa-print mr-2"></i>Print Report
+                                </button>
+                            </div>
+
+                            <!-- Key Metrics Cards -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                <div class="business-card p-6 card-hover">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <p class="text-sm font-medium text-gray-600">Today's Sales</p>
+                                            <p class="text-2xl font-bold text-green-600">${this.dataManager.formatCurrency(summary.totalSales)}</p>
+                                        </div>
+                                        <div class="bg-green-100 p-3 rounded-full">
+                                            <i class="fas fa-rupee-sign text-green-600 text-xl"></i>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="business-card p-6 card-hover">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <p class="text-sm font-medium text-gray-600">Orders Today</p>
+                                            <p class="text-2xl font-bold text-blue-600">${summary.totalOrders}</p>
+                                        </div>
+                                        <div class="bg-blue-100 p-3 rounded-full">
+                                            <i class="fas fa-shopping-cart text-blue-600 text-xl"></i>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="business-card p-6 card-hover">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <p class="text-sm font-medium text-gray-600">Production Today</p>
+                                            <p class="text-2xl font-bold text-purple-600">${summary.totalWeight}g</p>
+                                        </div>
+                                        <div class="bg-purple-100 p-3 rounded-full">
+                                            <i class="fas fa-weight text-purple-600 text-xl"></i>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="business-card p-6 card-hover">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <p class="text-sm font-medium text-gray-600">Pending Due</p>
+                                            <p class="text-2xl font-bold text-red-600">${this.dataManager.formatCurrency(totalDue)}</p>
+                                        </div>
+                                        <div class="bg-red-100 p-3 rounded-full">
+                                            <i class="fas fa-exclamation-triangle text-red-600 text-xl"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Recent Orders -->
+                            <div class="business-card p-6">
+                                <h3 class="text-lg font-semibold text-gray-800 mb-4">📋 Recent Orders</h3>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-sm">
+                                        <thead class="bg-gray-50">
+                                            <tr>
+                                                <th class="px-4 py-2 text-left">Customer</th>
+                                                <th class="px-4 py-2 text-left">Date</th>
+                                                <th class="px-4 py-2 text-left">Weight</th>
+                                                <th class="px-4 py-2 text-left">Amount</th>
+                                                <th class="px-4 py-2 text-left">Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${orders.slice(-5).reverse().map(order => `
+                                                <tr class="border-t">
+                                                    <td class="px-4 py-2 font-medium">${order.customerName}</td>
+                                                    <td class="px-4 py-2">${this.dataManager.formatDate(order.createdAt)}</td>
+                                                    <td class="px-4 py-2">${order.totalWeight}g</td>
+                                                    <td class="px-4 py-2">${this.dataManager.formatCurrency(order.totalAmount)}</td>
+                                                    <td class="px-4 py-2">
+                                                        <span class="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
+                                                            Completed
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Quick Actions -->
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <button onclick="uiRenderer.switchModule('orders')" class="business-card p-6 card-hover text-center hover:bg-blue-50 transition-colors">
+                                    <i class="fas fa-plus-circle text-3xl text-blue-600 mb-3"></i>
+                                    <h4 class="font-semibold text-gray-800">Add New Order</h4>
+                                    <p class="text-sm text-gray-600 mt-1">Create a new customer order</p>
+                                </button>
+
+                                <button onclick="uiRenderer.switchModule('materials')" class="business-card p-6 card-hover text-center hover:bg-green-50 transition-colors">
+                                    <i class="fas fa-boxes text-3xl text-green-600 mb-3"></i>
+                                    <h4 class="font-semibold text-gray-800">Track Materials</h4>
+                                    <p class="text-sm text-gray-600 mt-1">Update material usage</p>
+                                </button>
+
+                                <button onclick="uiRenderer.switchModule('payments')" class="business-card p-6 card-hover text-center hover:bg-yellow-50 transition-colors">
+                                    <i class="fas fa-money-check text-3xl text-yellow-600 mb-3"></i>
+                                    <h4 class="font-semibold text-gray-800">Record Payment</h4>
+                                    <p class="text-sm text-gray-600 mt-1">Update payment status</p>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // ==========================================
+                // 📋 ORDERS MODULE
+                // ==========================================
+                
+                renderOrders() {
+                    const orders = this.dataManager.getOrders();
+                    
+                    return `
+                        <div class="space-y-6">
+                            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <h2 class="text-2xl font-bold text-gray-800">📋 Orders Management</h2>
+                                <button onclick="uiRenderer.showAddOrderForm()" class="bg-primary text-white px-6 py-2 rounded-lg hover:bg-orange-600 transition-colors">
+                                    <i class="fas fa-plus mr-2"></i>Add New Order
+                                </button>
+                            </div>
+
+                            <!-- Add Order Form (Hidden by default) -->
+                            <div id="orderForm" class="business-card p-6 hidden">
+                                <h3 class="text-lg font-semibold text-gray-800 mb-4">➕ Add New Order</h3>
+                                <form id="newOrderForm" class="space-y-4">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-2">Customer Name *</label>
+                                            <input type="text" id="customerName" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-2">Delivery Date *</label>
+                                            <input type="date" id="deliveryDate" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+                                        </div>
+                                    </div>
+
+                                    <!-- Package Selection -->
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-3">Select Packages</label>
+                                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="packageSelection">
+                                            ${CONFIG.DEFAULT_PACKET_SIZES.map(size => `
+                                                <div class="border border-gray-300 rounded-lg p-4 text-center">
+                                                    <label class="block text-sm font-medium text-gray-700 mb-2">${size}g Packets</label>
+                                                    <input type="number" id="qty_${size}" min="0" value="0" class="w-full p-2 border border-gray-300 rounded text-center package-qty" data-size="${size}">
+                                                    <div class="mt-2 text-xs text-gray-500">Rate: ₹${size/10}/packet</div>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+
+                                    <!-- Order Summary -->
+                                    <div class="bg-gray-50 p-4 rounded-lg">
+                                        <h4 class="font-medium text-gray-800 mb-2">Order Summary</h4>
+                                        <div class="text-sm space-y-1">
+                                            <div class="flex justify-between">
+                                                <span>Total Weight:</span>
+                                                <span id="totalWeight" class="font-medium">0g</span>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span>Total Packets:</span>
+                                                <span id="totalPackets" class="font-medium">0</span>
+                                            </div>
+                                            <div class="flex justify-between text-lg font-semibold border-t pt-2">
+                                                <span>Total Amount:</span>
+                                                <span id="totalAmount" class="text-primary">₹0</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex gap-4">
+                                        <button type="submit" class="bg-success text-white px-6 py-2 rounded-lg hover:bg-green-600 transition-colors">
+                                            <i class="fas fa-save mr-2"></i>Save Order
+                                        </button>
+                                        <button type="button" onclick="uiRenderer.hideAddOrderForm()" class="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition-colors">
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <!-- Orders List -->
+                            <div class="business-card p-6">
+                                <div class="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
+                                    <h3 class="text-lg font-semibold text-gray-800">All Orders</h3>
+                                    <div class="flex gap-2">
+                                        <input type="text" id="searchOrders" placeholder="Search by customer..." class="p-2 border border-gray-300 rounded-lg">
+                                        <input type="date" id="filterDate" class="p-2 border border-gray-300 rounded-lg">
+                                    </div>
+                                </div>
+
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-sm" id="ordersTable">
+                                        <thead class="bg-gray-50">
+                                            <tr>
+                                                <th class="px-4 py-3 text-left">Order ID</th>
+                                                <th class="px-4 py-3 text-left">Customer</th>
+                                                <th class="px-4 py-3 text-left">Date</th>
+                                                <th class="px-4 py-3 text-left">Delivery</th>
+                                                <th class="px-4 py-3 text-left">Weight</th>
+                                                <th class="px-4 py-3 text-left">Amount</th>
+                                                <th class="px-4 py-3 text-left">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="ordersTableBody">
+                                            ${orders.map(order => `
+                                                <tr class="border-t hover:bg-gray-50">
+                                                    <td class="px-4 py-3 font-mono text-xs">#${order.id.toString().slice(-6)}</td>
+                                                    <td class="px-4 py-3 font-medium">${order.customerName}</td>
+                                                    <td class="px-4 py-3">${this.dataManager.formatDate(order.createdAt)}</td>
+                                                    <td class="px-4 py-3">${this.dataManager.formatDate(order.deliveryDate)}</td>
+                                                    <td class="px-4 py-3">${order.totalWeight}g</td>
+                                                    <td class="px-4 py-3 font-semibold text-green-600">${this.dataManager.formatCurrency(order.totalAmount)}</td>
+                                                    <td class="px-4 py-3">
+                                                        <button onclick="uiRenderer.viewOrderDetails('${order.id}')" class="text-blue-600 hover:text-blue-800 mr-2">
+                                                            <i class="fas fa-eye"></i>
+                                                        </button>
+                                                        <button onclick="uiRenderer.deleteOrder('${order.id}')" class="text-red-600 hover:text-red-800">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Initialize orders module functionality
+                initializeOrdersModule() {
+                    // Real-time calculation for order form
+                    const packageInputs = document.querySelectorAll('.package-qty');
+                    packageInputs.forEach(input => {
+                        input.addEventListener('input', () => this.calculateOrderSummary());
+                    });
+
+                    // Form submission
+                    const form = document.getElementById('newOrderForm');
+                    if (form) {
+                        form.addEventListener('submit', (e) => this.handleOrderSubmission(e));
+                    }
+
+                    // Search and filter functionality
+                    const searchInput = document.getElementById('searchOrders');
+                    const dateFilter = document.getElementById('filterDate');
+                    
+                    if (searchInput) {
+                        searchInput.addEventListener('input', () => this.filterOrders());
+                    }
+                    if (dateFilter) {
+                        dateFilter.addEventListener('change', () => this.filterOrders());
+                    }
+                }
+
+                // Calculate order summary in real-time
+                calculateOrderSummary() {
+                    let totalWeight = 0;
+                    let totalPackets = 0;
+                    let totalAmount = 0;
+
+                    CONFIG.DEFAULT_PACKET_SIZES.forEach(size => {
+                        const qty = parseInt(document.getElementById(`qty_${size}`).value) || 0;
+                        const weight = size * qty;
+                        const amount = (size / 10) * qty; // ₹1 per 10g
+
+                        totalWeight += weight;
+                        totalPackets += qty;
+                        totalAmount += amount;
+                    });
+
+                    document.getElementById('totalWeight').textContent = `${totalWeight}g`;
+                    document.getElementById('totalPackets').textContent = totalPackets;
+                    document.getElementById('totalAmount').textContent = this.dataManager.formatCurrency(totalAmount);
+                }
+
+                // Handle order form submission
+                handleOrderSubmission(e) {
+                    e.preventDefault();
+                    
+                    const customerName = document.getElementById('customerName').value;
+                    const deliveryDate = document.getElementById('deliveryDate').value;
+                    
+                    let packages = [];
+                    let totalWeight = 0;
+                    let totalAmount = 0;
+
+                    CONFIG.DEFAULT_PACKET_SIZES.forEach(size => {
+                        const qty = parseInt(document.getElementById(`qty_${size}`).value) || 0;
+                        if (qty > 0) {
+                            packages.push({
+                                size: size,
+                                quantity: qty,
+                                weight: size * qty,
+                                amount: (size / 10) * qty
+                            });
+                            totalWeight += size * qty;
+                            totalAmount += (size / 10) * qty;
+                        }
+                    });
+
+                    if (packages.length === 0) {
+                        alert('कृपया कम से कम एक पैकेज का आर्डर दें! (Please order at least one package!)');
+                        return;
+                    }
+
+                    const order = {
+                        customerName,
+                        deliveryDate,
+                        packages,
+                        totalWeight,
+                        totalAmount,
+                        status: 'pending'
+                    };
+
+                    this.dataManager.addOrder(order);
+                    this.hideAddOrderForm();
+                    this.renderModule('orders');
+                    
+                    // Show success message
+                    this.showToast('✅ Order successfully created!', 'success');
+                }
+
+                // Show/hide order form
+                showAddOrderForm() {
+                    document.getElementById('orderForm').classList.remove('hidden');
+                    document.getElementById('customerName').focus();
+                    
+                    // Set default delivery date to tomorrow
+                    const tomorrow = new Date();
+                    tomorrow.setDate(tomorrow.getDate() + 1);
+                    document.getElementById('deliveryDate').value = tomorrow.toISOString().split('T')[0];
+                }
+
+                hideAddOrderForm() {
+                    document.getElementById('orderForm').classList.add('hidden');
+                    document.getElementById('newOrderForm').reset();
+                    this.calculateOrderSummary();
+                }
+
+                // Filter orders based on search and date
+                filterOrders() {
+                    const searchTerm = document.getElementById('searchOrders').value.toLowerCase();
+                    const dateFilter = document.getElementById('filterDate').value;
+                    const orders = this.dataManager.getOrders();
+
+                    let filteredOrders = orders;
+
+                    if (searchTerm) {
+                        filteredOrders = filteredOrders.filter(order => 
+                            order.customerName.toLowerCase().includes(searchTerm)
+                        );
+                    }
+
+                    if (dateFilter) {
+                        filteredOrders = filteredOrders.filter(order => 
+                            order.deliveryDate === dateFilter
+                        );
+                    }
+
+                    // Update table with filtered results
+                    const tbody = document.getElementById('ordersTableBody');
+                    tbody.innerHTML = filteredOrders.map(order => `
+                        <tr class="border-t hover:bg-gray-50">
+                            <td class="px-4 py-3 font-mono text-xs">#${order.id.toString().slice(-6)}</td>
+                            <td class="px-4 py-3 font-medium">${order.customerName}</td>
+                            <td class="px-4 py-3">${this.dataManager.formatDate(order.createdAt)}</td>
+                            <td class="px-4 py-3">${this.dataManager.formatDate(order.deliveryDate)}</td>
+                            <td class="px-4 py-3">${order.totalWeight}g</td>
+                            <td class="px-4 py-3 font-semibold text-green-600">${this.dataManager.formatCurrency(order.totalAmount)}</td>
+                            <td class="px-4 py-3">
+                                <button onclick="uiRenderer.viewOrderDetails('${order.id}')" class="text-blue-600 hover:text-blue-800 mr-2">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button onclick="uiRenderer.deleteOrder('${order.id}')" class="text-red-600 hover:text-red-800">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+
+                // ==========================================
+                // ⚙️ MATERIALS MODULE
+                // ==========================================
+                
+                renderMaterials() {
+                    const materials = this.dataManager.getMaterials();
+                    
+                    return `
+                        <div class="space-y-6">
+                            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <h2 class="text-2xl font-bold text-gray-800">⚙️ Materials Management</h2>
+                                <button onclick="uiRenderer.showMaterialUsageForm()" class="bg-primary text-white px-6 py-2 rounded-lg hover:bg-orange-600 transition-colors">
+                                    <i class="fas fa-plus mr-2"></i>Record Usage
+                                </button>
+                            </div>
+
+                            <!-- Material Usage Form -->
+                            <div id="materialUsageForm" class="business-card p-6 hidden">
+                                <h3 class="text-lg font-semibold text-gray-800 mb-4">📝 Record Material Usage</h3>
+                                <form id="usageForm" class="space-y-4">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                                            <input type="date" id="usageDate" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-2">Production Batch (kg)</label>
+                                            <input type="number" id="batchSize" min="0" step="0.1" placeholder="Enter total production" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+                                        </div>
+                                    </div>
+
+                                    <!-- Auto-calculated material requirements -->
+                                    <div class="bg-blue-50 p-4 rounded-lg">
+                                        <h4 class="font-medium text-blue-800 mb-3">🧮 Auto-Calculated Requirements</h4>
+                                        <div id="materialRequirements" class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                            <!-- Requirements will be calculated and displayed here -->
+                                        </div>
+                                    </div>
+
+                                    <div class="flex gap-4">
+                                        <button type="submit" class="bg-success text-white px-6 py-2 rounded-lg hover:bg-green-600 transition-colors">
+                                            <i class="fas fa-save mr-2"></i>Record Usage
+                                        </button>
+                                        <button type="button" onclick="uiRenderer.hideMaterialUsageForm()" class="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition-colors">
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <!-- Materials Overview -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                ${materials.map(material => `
+                                    <div class="business-card p-6 card-hover">
+                                        <div class="flex items-center justify-between mb-4">
+                                            <h3 class="text-lg font-semibold text-gray-800">${material.name}</h3>
+                                            <div class="text-right">
+                                                <div class="text-sm text-gray-600">Rate</div>
+                                                <div class="font-semibold text-primary">${this.dataManager.formatCurrency(material.pricePerUnit)}/${material.unit}</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="space-y-3">
+                                            <div class="flex justify-between">
+                                                <span class="text-gray-600">Current Stock:</span>
+                                                <span class="font-medium">${material.stock} ${material.unit}</span>
+                                            </div>
+                                            
+                                            <!-- Quick stock update -->
+                                            <div class="flex gap-2">
+                                                <input type="number" id="stock_${material.id}" placeholder="Add stock" class="flex-1 p-2 border border-gray-300 rounded text-sm">
+                                                <button onclick="uiRenderer.updateStock(${material.id})" class="bg-blue-500 text-white px-3 py-2 rounded text-sm hover:bg-blue-600">
+                                                    Add
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+
+                            <!-- Recent Usage History -->
+                            <div class="business-card p-6">
+                                <h3 class="text-lg font-semibold text-gray-800 mb-4">📊 Recent Usage History</h3>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-sm">
+                                        <thead class="bg-gray-50">
+                                            <tr>
+                                                <th class="px-4 py-3 text-left">Date</th>
+                                                <th class="px-4 py-3 text-left">Batch Size</th>
+                                                <th class="px-4 py-3 text-left">Maida Used</th>
+                                                <th class="px-4 py-3 text-left">Oil Used</th>
+                                                <th class="px-4 py-3 text-left">Total Cost</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr class="border-t">
+                                                <td class="px-4 py-3" colspan="5" class="text-center text-gray-500">
+                                                    No usage recorded yet. Start by recording your first batch!
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Initialize materials module
+                initializeMaterialsModule() {
+                    // Auto-calculate requirements when batch size changes
+                    const batchInput = document.getElementById('batchSize');
+                    if (batchInput) {
+                        batchInput.addEventListener('input', () => this.calculateMaterialRequirements());
+                    }
+
+                    // Set today's date as default
+                    const dateInput = document.getElementById('usageDate');
+                    if (dateInput) {
+                        dateInput.value = new Date().toISOString().split('T')[0];
+                    }
+                }
+
+                // Calculate material requirements based on batch size
+                calculateMaterialRequirements() {
+                    const batchSize = parseFloat(document.getElementById('batchSize').value) || 0;
+                    
+                    if (batchSize <= 0) {
+                        document.getElementById('materialRequirements').innerHTML = '<p class="text-gray-500">Enter batch size to see requirements</p>';
+                        return;
+                    }
+
+                    const requirements = this.calculator.calculateMaterialRequirements(batchSize * 1000); // Convert to grams
+                    const materials = this.dataManager.getMaterials();
+
+                    let totalCost = 0;
+                    const requirementsList = Object.entries(requirements).map(([materialName, quantity]) => {
+                        if (materialName === 'gasMinutes') {
+                            const cost = quantity * CONFIG.GAS_COST_PER_MINUTE;
+                            totalCost += cost;
+                            return `
+                                <div class="flex justify-between">
+                                    <span>Gas Usage:</span>
+                                    <span class="font-medium">${quantity} minutes (${this.dataManager.formatCurrency(cost)})</span>
+                                </div>
+                            `;
+                        } else {
+                            const material = materials.find(m => m.name.toLowerCase() === materialName.toLowerCase());
+                            const cost = material ? quantity * material.pricePerUnit : 0;
+                            totalCost += cost;
+                            return `
+                                <div class="flex justify-between">
+                                    <span>${materialName.charAt(0).toUpperCase() + materialName.slice(1)}:</span>
+                                    <span class="font-medium">${quantity.toFixed(2)} ${material?.unit || 'units'} (${this.dataManager.formatCurrency(cost)})</span>
+                                </div>
+                            `;
+                        }
+                    }).join('');
+
+                    document.getElementById('materialRequirements').innerHTML = `
+                        ${requirementsList}
+                        <div class="flex justify-between border-t pt-2 font-semibold text-lg">
+                            <span>Total Cost:</span>
+                            <span class="text-primary">${this.dataManager.formatCurrency(totalCost)}</span>
+                        </div>
+                    `;
+                }
+
+                // Show/hide material usage form
+                showMaterialUsageForm() {
+                    document.getElementById('materialUsageForm').classList.remove('hidden');
+                    document.getElementById('batchSize').focus();
+                }
+
+                hideMaterialUsageForm() {
+                    document.getElementById('materialUsageForm').classList.add('hidden');
+                    document.getElementById('usageForm').reset();
+                    document.getElementById('materialRequirements').innerHTML = '';
+                }
+
+                // Update stock for a material
+                updateStock(materialId) {
+                    const stockInput = document.getElementById(`stock_${materialId}`);
+                    const additionalStock = parseFloat(stockInput.value) || 0;
+                    
+                    if (additionalStock <= 0) {
+                        alert('कृपया सही मात्रा दर्ज करें! (Please enter a valid quantity!)');
+                        return;
+                    }
+
+                    const materials = this.dataManager.getMaterials();
+                    const materialIndex = materials.findIndex(m => m.id === materialId);
+                    
+                    if (materialIndex !== -1) {
+                        materials[materialIndex].stock += additionalStock;
+                        this.dataManager.saveMaterials(materials);
+                        stockInput.value = '';
+                        this.renderModule('materials');
+                        this.showToast(`✅ Stock updated for ${materials[materialIndex].name}!`, 'success');
+                    }
+                }
+
+                // ==========================================
+                // 📈 PROFIT MODULE
+                // ==========================================
+                
+                renderProfit() {
+                    const orders = this.dataManager.getOrders();
+                    
+                    // Calculate overall profit metrics
+                    let totalRevenue = 0;
+                    let totalCost = 0;
+                    
+                    orders.forEach(order => {
+                        totalRevenue += order.totalAmount || 0;
+                        // Estimate cost based on weight (simplified calculation)
+                        const estimatedCost = (order.totalWeight / 1000) * 80; // ₹80 per kg average cost
+                        totalCost += estimatedCost;
+                    });
+
+                    const totalProfit = totalRevenue - totalCost;
+                    const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue * 100) : 0;
+
+                    return `
+                        <div class="space-y-6">
+                            <h2 class="text-2xl font-bold text-gray-800">📈 Profit Analysis</h2>
+
+                            <!-- Profit Overview Cards -->
+                            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                <div class="business-card p-6 card-hover">
+                                    <div class="text-center">
+                                        <i class="fas fa-rupee-sign text-3xl text-green-600 mb-3"></i>
+                                        <h3 class="text-sm font-medium text-gray-600">Total Revenue</h3>
+                                        <p class="text-2xl font-bold text-green-600">${this.dataManager.formatCurrency(totalRevenue)}</p>
+                                    </div>
+                                </div>
+
+                                <div class="business-card p-6 card-hover">
+                                    <div class="text-center">
+                                        <i class="fas fa-minus-circle text-3xl text-red-600 mb-3"></i>
+                                        <h3 class="text-sm font-medium text-gray-600">Total Cost</h3>
+                                        <p class="text-2xl font-bold text-red-600">${this.dataManager.formatCurrency(totalCost)}</p>
+                                    </div>
+                                </div>
+
+                                <div class="business-card p-6 card-hover">
+                                    <div class="text-center">
+                                        <i class="fas fa-chart-line text-3xl text-blue-600 mb-3"></i>
+                                        <h3 class="text-sm font-medium text-gray-600">Net Profit</h3>
+                                        <p class="text-2xl font-bold ${totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}">${this.dataManager.formatCurrency(totalProfit)}</p>
+                                    </div>
+                                </div>
+
+                                <div class="business-card p-6 card-hover">
+                                    <div class="text-center">
+                                        <i class="fas fa-percentage text-3xl text-purple-600 mb-3"></i>
+                                        <h3 class="text-sm font-medium text-gray-600">Profit Margin</h3>
+                                        <p class="text-2xl font-bold text-purple-600">${profitMargin.toFixed(1)}%</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Profit per Package Size -->
+                            <div class="business-card p-6">
+                                <h3 class="text-lg font-semibold text-gray-800 mb-4">💰 Profit per Package Size</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    ${CONFIG.DEFAULT_PACKET_SIZES.map(size => {
+                                        const sellingPrice = size / 10; // ₹1 per 10g
+                                        const costPrice = (size / 1000) * 80; // ₹80 per kg cost
+                                        const profit = sellingPrice - costPrice;
+                                        const profitPercent = (profit / sellingPrice * 100);
+                                        
+                                        return `
+                                            <div class="border border-gray-200 rounded-lg p-4 text-center">
+                                                <h4 class="font-semibold text-gray-800 mb-2">${size}g Packet</h4>
+                                                <div class="space-y-2 text-sm">
+                                                    <div class="flex justify-between">
+                                                        <span>Selling:</span>
+                                                        <span class="font-medium">${this.dataManager.formatCurrency(sellingPrice)}</span>
+                                                    </div>
+                                                    <div class="flex justify-between">
+                                                        <span>Cost:</span>
+                                                        <span class="font-medium">${this.dataManager.formatCurrency(costPrice)}</span>
+                                                    </div>
+                                                    <div class="flex justify-between border-t pt-2 font-semibold">
+                                                        <span>Profit:</span>
+                                                        <span class="text-green-600">${this.dataManager.formatCurrency(profit)}</span>
+                                                    </div>
+                                                    <div class="text-xs text-gray-500">${profitPercent.toFixed(1)}% margin</div>
+                                                </div>
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+
+                            <!-- Monthly Profit Trend -->
+                            <div class="business-card p-6">
+                                <h3 class="text-lg font-semibold text-gray-800 mb-4">📊 Profit Breakdown by Orders</h3>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-sm">
+                                        <thead class="bg-gray-50">
+                                            <tr>
+                                                <th class="px-4 py-3 text-left">Customer</th>
+                                                <th class="px-4 py-3 text-left">Date</th>
+                                                <th class="px-4 py-3 text-left">Weight</th>
+                                                <th class="px-4 py-3 text-left">Revenue</th>
+                                                <th class="px-4 py-3 text-left">Est. Cost</th>
+                                                <th class="px-4 py-3 text-left">Profit</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${orders.slice(-10).reverse().map(order => {
+                                                const estimatedCost = (order.totalWeight / 1000) * 80;
+                                                const profit = (order.totalAmount || 0) - estimatedCost;
+                                                
+                                                return `
+                                                    <tr class="border-t hover:bg-gray-50">
+                                                        <td class="px-4 py-3 font-medium">${order.customerName}</td>
+                                                        <td class="px-4 py-3">${this.dataManager.formatDate(order.createdAt)}</td>
+                                                        <td class="px-4 py-3">${order.totalWeight}g</td>
+                                                        <td class="px-4 py-3 text-green-600">${this.dataManager.formatCurrency(order.totalAmount)}</td>
+                                                        <td class="px-4 py-3 text-red-600">${this.dataManager.formatCurrency(estimatedCost)}</td>
+                                                        <td class="px-4 py-3 font-semibold ${profit >= 0 ? 'text-green-600' : 'text-red-600'}">${this.dataManager.formatCurrency(profit)}</td>
+                                                    </tr>
+                                                `;
+                                            }).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Cost Optimization Tips -->
+                            <div class="business-card p-6 bg-yellow-50 border-yellow-200">
+                                <h3 class="text-lg font-semibold text-yellow-800 mb-4">💡 Profit Optimization Tips</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                    <div class="space-y-2">
+                                        <h4 class="font-medium text-yellow-800">Cost Reduction:</h4>
+                                        <ul class="space-y-1 text-yellow-700">
+                                            <li>• Buy materials in bulk for better rates</li>
+                                            <li>• Monitor gas usage efficiency</li>
+                                            <li>• Reduce material wastage</li>
+                                            <li>• Optimize batch sizes</li>
+                                        </ul>
+                                    </div>
+                                    <div class="space-y-2">
+                                        <h4 class="font-medium text-yellow-800">Revenue Increase:</h4>
+                                        <ul class="space-y-1 text-yellow-700">
+                                            <li>• Focus on higher margin packages</li>
+                                            <li>• Offer bulk discounts for large orders</li>
+                                            <li>• Introduce premium variants</li>
+                                            <li>• Expand customer base</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // ==========================================
+                // 💰 PAYMENTS MODULE
+                // ==========================================
+                
+                renderPayments() {
+                    const orders = this.dataManager.getOrders();
+                    const payments = this.dataManager.getPayments();
+                    
+                    // Calculate payment summary
+                    let totalReceivable = 0;
+                    let totalReceived = 0;
+                    let totalPending = 0;
+
+                    const paymentSummary = orders.map(order => {
+                        const orderPayments = payments.filter(p => p.orderId === order.id);
+                        const paidAmount = orderPayments.reduce((sum, p) => sum + p.amount, 0);
+                        const pendingAmount = (order.totalAmount || 0) - paidAmount;
+                        
+                        totalReceivable += order.totalAmount || 0;
+                        totalReceived += paidAmount;
+                        totalPending += pendingAmount;
+
+                        return {
+                            ...order,
+                            paidAmount,
+                            pendingAmount,
+                            status: pendingAmount <= 0 ? 'Paid' : paidAmount > 0 ? 'Partial' : 'Unpaid'
+                        };
+                    });
+
+                    return `
+                        <div class="space-y-6">
+                            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <h2 class="text-2xl font-bold text-gray-800">💰 Payment Tracking</h2>
+                                <button onclick="uiRenderer.showPaymentForm()" class="bg-primary text-white px-6 py-2 rounded-lg hover:bg-orange-600 transition-colors">
+                                    <i class="fas fa-plus mr-2"></i>Record Payment
+                                </button>
+                            </div>
+
+                            <!-- Payment Summary Cards -->
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div class="business-card p-6 card-hover">
+                                    <div class="text-center">
+                                        <i class="fas fa-hand-holding-usd text-3xl text-blue-600 mb-3"></i>
+                                        <h3 class="text-sm font-medium text-gray-600">Total Receivable</h3>
+                                        <p class="text-2xl font-bold text-blue-600">${this.dataManager.formatCurrency(totalReceivable)}</p>
+                                    </div>
+                                </div>
+
+                                <div class="business-card p-6 card-hover">
+                                    <div class="text-center">
+                                        <i class="fas fa-check-circle text-3xl text-green-600 mb-3"></i>
+                                        <h3 class="text-sm font-medium text-gray-600">Total Received</h3>
+                                        <p class="text-2xl font-bold text-green-600">${this.dataManager.formatCurrency(totalReceived)}</p>
+                                    </div>
+                                </div>
+
+                                <div class="business-card p-6 card-hover">
+                                    <div class="text-center">
+                                        <i class="fas fa-clock text-3xl text-red-600 mb-3"></i>
+                                        <h3 class="text-sm font-medium text-gray-600">Total Pending</h3>
+                                        <p class="text-2xl font-bold text-red-600">${this.dataManager.formatCurrency(totalPending)}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Payment Form (Hidden by default) -->
+                            <div id="paymentForm" class="business-card p-6 hidden">
+                                <h3 class="text-lg font-semibold text-gray-800 mb-4">💳 Record Payment</h3>
+                                <form id="newPaymentForm" class="space-y-4">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-2">Select Order *</label>
+                                            <select id="paymentOrderId" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+                                                <option value="">Select an order...</option>
+                                                ${paymentSummary.filter(order => order.pendingAmount > 0).map(order => `
+                                                    <option value="${order.id}" data-pending="${order.pendingAmount}">
+                                                        ${order.customerName} - ${this.dataManager.formatCurrency(order.pendingAmount)} pending
+                                                    </option>
+                                                `).join('')}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-2">Payment Date *</label>
+                                            <input type="date" id="paymentDate" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+                                        </div>
+                                    </div>
+
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-2">Payment Amount *</label>
+                                            <input type="number" id="paymentAmount" min="0" step="0.01" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-2">Payment Mode *</label>
+                                            <select id="paymentMode" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+                                                <option value="cash">Cash</option>
+                                                <option value="upi">UPI</option>
+                                                <option value="bank_transfer">Bank Transfer</option>
+                                                <option value="cheque">Cheque</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Notes (Optional)</label>
+                                        <textarea id="paymentNotes" rows="2" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Any additional notes..."></textarea>
+                                    </div>
+
+                                    <div class="flex gap-4">
+                                        <button type="submit" class="bg-success text-white px-6 py-2 rounded-lg hover:bg-green-600 transition-colors">
+                                            <i class="fas fa-save mr-2"></i>Record Payment
+                                        </button>
+                                        <button type="button" onclick="uiRenderer.hidePaymentForm()" class="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition-colors">
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <!-- Payment Status Table -->
+                            <div class="business-card p-6">
+                                <h3 class="text-lg font-semibold text-gray-800 mb-4">📊 Payment Status</h3>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-sm">
+                                        <thead class="bg-gray-50">
+                                            <tr>
+                                                <th class="px-4 py-3 text-left">Customer</th>
+                                                <th class="px-4 py-3 text-left">Order Date</th>
+                                                <th class="px-4 py-3 text-left">Total Amount</th>
+                                                <th class="px-4 py-3 text-left">Paid</th>
+                                                <th class="px-4 py-3 text-left">Pending</th>
+                                                <th class="px-4 py-3 text-left">Status</th>
+                                                <th class="px-4 py-3 text-left">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${paymentSummary.map(order => `
+                                                <tr class="border-t hover:bg-gray-50">
+                                                    <td class="px-4 py-3 font-medium">${order.customerName}</td>
+                                                    <td class="px-4 py-3">${this.dataManager.formatDate(order.createdAt)}</td>
+                                                    <td class="px-4 py-3 font-semibold">${this.dataManager.formatCurrency(order.totalAmount)}</td>
+                                                    <td class="px-4 py-3 text-green-600">${this.dataManager.formatCurrency(order.paidAmount)}</td>
+                                                    <td class="px-4 py-3 text-red-600">${this.dataManager.formatCurrency(order.pendingAmount)}</td>
+                                                    <td class="px-4 py-3">
+                                                        <span class="px-2 py-1 rounded-full text-xs ${
+                                                            order.status === 'Paid' ? 'bg-green-100 text-green-800' :
+                                                            order.status === 'Partial' ? 'bg-yellow-100 text-yellow-800' :
+                                                            'bg-red-100 text-red-800'
+                                                        }">
+                                                            ${order.status}
+                                                        </span>
+                                                    </td>
+                                                    <td class="px-4 py-3">
+                                                        ${order.pendingAmount > 0 ? `
+                                                            <button onclick="uiRenderer.quickPayment('${order.id}', ${order.pendingAmount})" class="text-blue-600 hover:text-blue-800">
+                                                                <i class="fas fa-money-bill"></i>
+                                                            </button>
+                                                        ` : ''}
+                                                    </td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Initialize payments module
+                initializePaymentsModule() {
+                    // Set today's date as default
+                    const dateInput = document.getElementById('paymentDate');
+                    if (dateInput) {
+                        dateInput.value = new Date().toISOString().split('T')[0];
+                    }
+
+                    // Auto-fill payment amount when order is selected
+                    const orderSelect = document.getElementById('paymentOrderId');
+                    const amountInput = document.getElementById('paymentAmount');
+                    
+                    if (orderSelect && amountInput) {
+                        orderSelect.addEventListener('change', function() {
+                            const selectedOption = this.options[this.selectedIndex];
+                            const pendingAmount = selectedOption.getAttribute('data-pending');
+                            if (pendingAmount) {
+                                amountInput.value = pendingAmount;
+                            }
+                        });
+                    }
+
+                    // Form submission
+                    const form = document.getElementById('newPaymentForm');
+                    if (form) {
+                        form.addEventListener('submit', (e) => this.handlePaymentSubmission(e));
+                    }
+                }
+
+                // Handle payment form submission
+                handlePaymentSubmission(e) {
+                    e.preventDefault();
+                    
+                    const orderId = document.getElementById('paymentOrderId').value;
+                    const amount = parseFloat(document.getElementById('paymentAmount').value);
+                    const date = document.getElementById('paymentDate').value;
+                    const mode = document.getElementById('paymentMode').value;
+                    const notes = document.getElementById('paymentNotes').value;
+
+                    const payment = {
+                        id: this.dataManager.generateId(),
+                        orderId: parseInt(orderId),
+                        amount,
+                        date,
+                        mode,
+                        notes,
+                        createdAt: new Date().toISOString()
+                    };
+
+                    const payments = this.dataManager.getPayments();
+                    payments.push(payment);
+                    this.dataManager.savePayments(payments);
+
+                    this.hidePaymentForm();
+                    this.renderModule('payments');
+                    this.showToast('✅ Payment recorded successfully!', 'success');
+                }
+
+                // Show/hide payment form
+                showPaymentForm() {
+                    document.getElementById('paymentForm').classList.remove('hidden');
+                    document.getElementById('paymentOrderId').focus();
+                }
+
+                hidePaymentForm() {
+                    document.getElementById('paymentForm').classList.add('hidden');
+                    document.getElementById('newPaymentForm').reset();
+                }
+
+                // Quick payment for full pending amount
+                quickPayment(orderId, pendingAmount) {
+                    const confirmed = confirm(`Record full payment of ${this.dataManager.formatCurrency(pendingAmount)}?`);
+                    if (confirmed) {
+                        const payment = {
+                            id: this.dataManager.generateId(),
+                            orderId: parseInt(orderId),
+                            amount: pendingAmount,
+                            date: new Date().toISOString().split('T')[0],
+                            mode: 'cash',
+                            notes: 'Quick payment',
+                            createdAt: new Date().toISOString()
+                        };
+
+                        const payments = this.dataManager.getPayments();
+                        payments.push(payment);
+                        this.dataManager.savePayments(payments);
+
+                        this.renderModule('payments');
+                        this.showToast('✅ Payment recorded successfully!', 'success');
+                    }
+                }
+
+                // ==========================================
+                // 🔮 FORECAST MODULE
+                // ==========================================
+                
+                renderForecast() {
+                    const orders = this.dataManager.getOrders();
+                    
+                    // Get upcoming orders (next 7 days)
+                    const today = new Date();
+                    const nextWeek = new Date();
+                    nextWeek.setDate(today.getDate() + 7);
+                    
+                    const upcomingOrders = orders.filter(order => {
+                        const deliveryDate = new Date(order.deliveryDate);
+                        return deliveryDate >= today && deliveryDate <= nextWeek;
+                    });
+
+                    // Calculate total requirements for upcoming orders
+                    let totalUpcomingWeight = 0;
+                    upcomingOrders.forEach(order => {
+                        totalUpcomingWeight += order.totalWeight || 0;
+                    });
+
+                    const requirements = this.calculator.calculateMaterialRequirements(totalUpcomingWeight);
+                    const materials = this.dataManager.getMaterials();
+
+                    return `
+                        <div class="space-y-6">
+                            <h2 class="text-2xl font-bold text-gray-800">🔮 Business Forecast</h2>
+
+                            <!-- Upcoming Orders Summary -->
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div class="business-card p-6 card-hover">
+                                    <div class="text-center">
+                                        <i class="fas fa-calendar-week text-3xl text-blue-600 mb-3"></i>
+                                        <h3 class="text-sm font-medium text-gray-600">Upcoming Orders</h3>
+                                        <p class="text-2xl font-bold text-blue-600">${upcomingOrders.length}</p>
+                                        <p class="text-xs text-gray-500 mt-1">Next 7 days</p>
+                                    </div>
+                                </div>
+
+                                <div class="business-card p-6 card-hover">
+                                    <div class="text-center">
+                                        <i class="fas fa-weight-hanging text-3xl text-green-600 mb-3"></i>
+                                        <h3 class="text-sm font-medium text-gray-600">Total Production</h3>
+                                        <p class="text-2xl font-bold text-green-600">${totalUpcomingWeight}g</p>
+                                        <p class="text-xs text-gray-500 mt-1">Required</p>
+                                    </div>
+                                </div>
+
+                                <div class="business-card p-6 card-hover">
+                                    <div class="text-center">
+                                        <i class="fas fa-rupee-sign text-3xl text-purple-600 mb-3"></i>
+                                        <h3 class="text-sm font-medium text-gray-600">Expected Revenue</h3>
+                                        <p class="text-2xl font-bold text-purple-600">${this.dataManager.formatCurrency(upcomingOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0))}</p>
+                                        <p class="text-xs text-gray-500 mt-1">Next 7 days</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Material Requirements -->
+                            <div class="business-card p-6">
+                                <h3 class="text-lg font-semibold text-gray-800 mb-4">📦 Material Requirements</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    ${Object.entries(requirements).map(([materialName, quantity]) => {
+                                        if (materialName === 'gasMinutes') {
+                                            const cylinders = Math.ceil(quantity / 300); // Assuming 300 minutes per cylinder
+                                            const cost = cylinders * 800; // ₹800 per cylinder
+                                            return `
+                                                <div class="border border-gray-200 rounded-lg p-4">
+                                                    <div class="flex items-center justify-between mb-3">
+                                                        <h4 class="font-semibold text-gray-800">Gas</h4>
+                                                        <i class="fas fa-fire text-red-500"></i>
+                                                    </div>
+                                                    <div class="space-y-2 text-sm">
+                                                        <div class="flex justify-between">
+                                                            <span>Required:</span>
+                                                            <span class="font-medium">${quantity} minutes</span>
+                                                        </div>
+                                                        <div class="flex justify-between">
+                                                            <span>Cylinders:</span>
+                                                            <span class="font-medium">${cylinders}</span>
+                                                        </div>
+                                                        <div class="flex justify-between text-primary font-semibold">
+                                                            <span>Cost:</span>
+                                                            <span>${this.dataManager.formatCurrency(cost)}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            `;
+                                        } else {
+                                            const material = materials.find(m => m.name.toLowerCase() === materialName.toLowerCase());
+                                            const currentStock = material ? material.stock : 0;
+                                            const shortfall = Math.max(0, quantity - currentStock);
+                                            const cost = material ? shortfall * material.pricePerUnit : 0;
+                                            
+                                            return `
+                                                <div class="border border-gray-200 rounded-lg p-4">
+                                                    <div class="flex items-center justify-between mb-3">
+                                                        <h4 class="font-semibold text-gray-800">${materialName.charAt(0).toUpperCase() + materialName.slice(1)}</h4>
+                                                        <i class="fas fa-box text-blue-500"></i>
+                                                    </div>
+                                                    <div class="space-y-2 text-sm">
+                                                        <div class="flex justify-between">
+                                                            <span>Required:</span>
+                                                            <span class="font-medium">${quantity.toFixed(2)} ${material?.unit || 'units'}</span>
+                                                        </div>
+                                                        <div class="flex justify-between">
+                                                            <span>In Stock:</span>
+                                                            <span class="font-medium">${currentStock} ${material?.unit || 'units'}</span>
+                                                        </div>
+                                                        <div class="flex justify-between ${shortfall > 0 ? 'text-red-600' : 'text-green-600'}">
+                                                            <span>${shortfall > 0 ? 'Need to Buy:' : 'Surplus:'}</span>
+                                                            <span class="font-medium">${shortfall > 0 ? shortfall.toFixed(2) : (currentStock - quantity).toFixed(2)} ${material?.unit || 'units'}</span>
+                                                        </div>
+                                                        ${shortfall > 0 ? `
+                                                            <div class="flex justify-between text-primary font-semibold border-t pt-2">
+                                                                <span>Cost:</span>
+                                                                <span>${this.dataManager.formatCurrency(cost)}</span>
+                                                            </div>
+                                                        ` : ''}
+                                                    </div>
+                                                </div>
+                                            `;
+                                        }
+                                    }).join('')}
+                                </div>
+                            </div>
+
+                            <!-- Upcoming Orders Timeline -->
+                            <div class="business-card p-6">
+                                <h3 class="text-lg font-semibold text-gray-800 mb-4">📅 Upcoming Orders Timeline</h3>
+                                <div class="space-y-4">
+                                    ${upcomingOrders.length > 0 ? upcomingOrders.map(order => {
+                                        const deliveryDate = new Date(order.deliveryDate);
+                                        const daysUntil = Math.ceil((deliveryDate - today) / (1000 * 60 * 60 * 24));
+                                        
+                                        return `
+                                            <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
+                                                <div class="flex items-center space-x-4">
+                                                    <div class="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-white font-semibold">
+                                                        ${daysUntil}
+                                                    </div>
+                                                    <div>
+                                                        <h4 class="font-semibold text-gray-800">${order.customerName}</h4>
+                                                        <p class="text-sm text-gray-600">${this.dataManager.formatDate(order.deliveryDate)}</p>
+                                                    </div>
+                                                </div>
+                                                <div class="text-right">
+                                                    <p class="font-semibold text-gray-800">${order.totalWeight}g</p>
+                                                    <p class="text-sm text-green-600">${this.dataManager.formatCurrency(order.totalAmount)}</p>
+                                                </div>
+                                            </div>
+                                        `;
+                                    }).join('') : `
+                                        <div class="text-center py-8 text-gray-500">
+                                            <i class="fas fa-calendar-times text-4xl mb-4"></i>
+                                            <p>No upcoming orders in the next 7 days</p>
+                                            <button onclick="uiRenderer.switchModule('orders')" class="mt-4 bg-primary text-white px-6 py-2 rounded-lg hover:bg-orange-600 transition-colors">
+                                                Add New Order
+                                            </button>
+                                        </div>
+                                    `}
+                                </div>
+                            </div>
+
+                            <!-- Business Insights -->
+                            <div class="business-card p-6 bg-blue-50 border-blue-200">
+                                <h3 class="text-lg font-semibold text-blue-800 mb-4">💡 Business Insights</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <h4 class="font-medium text-blue-800 mb-2">Production Planning:</h4>
+                                        <ul class="text-sm text-blue-700 space-y-1">
+                                            <li>• Schedule production ${Math.ceil(totalUpcomingWeight / 5000)} days before delivery</li>
+                                            <li>• Consider batch optimization for efficiency</li>
+                                            <li>• Maintain 10% extra stock for contingency</li>
+                                        </ul>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-medium text-blue-800 mb-2">Inventory Management:</h4>
+                                        <ul class="text-sm text-blue-700 space-y-1">
+                                            <li>• Order materials 2-3 days in advance</li>
+                                            <li>• Check for bulk purchase discounts</li>
+                                            <li>• Monitor expiry dates for perishables</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // ==========================================
+                // 🔧 UTILITY FUNCTIONS
+                // ==========================================
+                
+                // Show toast notification
+                showToast(message, type = 'info') {
+                    const toast = document.createElement('div');
+                    toast.className = `fixed top-4 right-4 z-50 px-6 py-3 rounded-lg text-white font-medium shadow-lg transition-all duration-300 ${
+                        type === 'success' ? 'bg-green-600' :
+                        type === 'error' ? 'bg-red-600' :
+                        type === 'warning' ? 'bg-yellow-600' :
+                        'bg-blue-600'
+                    }`;
+                    toast.textContent = message;
+                    
+                    document.body.appendChild(toast);
+                    
+                    // Auto remove after 3 seconds
+                    setTimeout(() => {
+                        toast.style.opacity = '0';
+                        toast.style.transform = 'translateX(100%)';
+                        setTimeout(() => {
+                            document.body.removeChild(toast);
+                        }, 300);
+                    }, 3000);
+                }
+
+                // View order details (modal)
+                viewOrderDetails(orderId) {
+                    const orders = this.dataManager.getOrders();
+                    const order = orders.find(o => o.id.toString() === orderId.toString());
+                    
+                    if (!order) {
+                        this.showToast('Order not found!', 'error');
+                        return;
+                    }
+
+                    // Create modal HTML
+                    const modalHTML = `
+                        <div class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" onclick="this.remove()">
+                            <div class="bg-white rounded-lg p-6 max-w-md w-full" onclick="event.stopPropagation()">
+                                <div class="flex items-center justify-between mb-4">
+                                    <h3 class="text-lg font-semibold text-gray-800">Order Details</h3>
+                                    <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                                
+                                <div class="space-y-3 text-sm">
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Order ID:</span>
+                                        <span class="font-medium">#${order.id.toString().slice(-6)}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Customer:</span>
+                                        <span class="font-medium">${order.customerName}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Order Date:</span>
+                                        <span class="font-medium">${this.dataManager.formatDate(order.createdAt)}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Delivery Date:</span>
+                                        <span class="font-medium">${this.dataManager.formatDate(order.deliveryDate)}</span>
+                                    </div>
+                                </div>
+
+                                <div class="mt-4 border-t pt-4">
+                                    <h4 class="font-medium text-gray-800 mb-2">Package Details:</h4>
+                                    <div class="space-y-2">
+                                        ${order.packages ? order.packages.map(pkg => `
+                                            <div class="flex justify-between text-sm">
+                                                <span>${pkg.quantity}x ${pkg.size}g packets</span>
+                                                <span>${this.dataManager.formatCurrency(pkg.amount)}</span>
+                                            </div>
+                                        `).join('') : ''}
+                                    </div>
+                                </div>
+
+                                <div class="mt-4 border-t pt-4 text-lg font-semibold flex justify-between">
+                                    <span>Total:</span>
+                                    <span class="text-primary">${this.dataManager.formatCurrency(order.totalAmount)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                    document.body.insertAdjacentHTML('beforeend', modalHTML);
+                }
+
+                // Delete order with confirmation
+                deleteOrder(orderId) {
+                    const confirmed = confirm('Are you sure you want to delete this order? This action cannot be undone.');
+                    if (confirmed) {
+                        const orders = this.dataManager.getOrders();
+                        const filteredOrders = orders.filter(o => o.id.toString() !== orderId.toString());
+                        this.dataManager.saveOrders(filteredOrders);
+                        this.renderModule('orders');
+                        this.showToast('Order deleted successfully!', 'success');
+                    }
+                }
+            }
+
+            // ==========================================
+            // 🚀 APPLICATION INITIALIZATION
+            // ==========================================
+            
+            // Initialize application when DOM is loaded
+            document.addEventListener('DOMContentLoaded', function() {
+                // Create global instances
+                window.dataManager = new DataManager();
+                window.businessCalculator = new BusinessCalculator(window.dataManager);
+                window.uiRenderer = new UIRenderer(window.dataManager, window.businessCalculator);
+                
+                // Initialize the UI
+                window.uiRenderer.init();
+                
+                console.log('🧂 CrunchTrack Business Suite initialized successfully!');
+            });
+
+        })();
+    </script>
+</body>
+</html>
