@@ -1094,7 +1094,7 @@ export default function PaymentTracker() {
 
                     {/* Order Summary */}
                     {(() => {
-                      const summary = calculateOrderSummary(orderForm.packages, orderForm.priceType);
+                      const summary = calculateOrderSummary(orderForm.packages, orderForm.productVariant);
                       return (
                         <Card className="bg-gray-50">
                           <CardContent className="p-4">

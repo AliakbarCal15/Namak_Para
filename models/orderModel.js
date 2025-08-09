@@ -47,6 +47,11 @@ const orderSchema = new mongoose.Schema({
     type: String,
     enum: ['pending', 'completed', 'cancelled'],
     default: 'pending'
+  },
+  productVariant: {
+    type: String,
+    enum: ['sada', 'peri-peri', 'cheese'],
+    default: 'sada'
   }
 }, {
   timestamps: true
